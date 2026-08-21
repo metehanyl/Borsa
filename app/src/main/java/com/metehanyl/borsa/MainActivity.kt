@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.metehanyl.borsa.ui.PortfolioViewModel
+import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 import com.metehanyl.borsa.ui.navigation.BorsaNavHost
 import com.metehanyl.borsa.ui.theme.KureselBorsaTheme
 
@@ -19,8 +20,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             KureselBorsaTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val viewModel: PortfolioViewModel = viewModel()
-                    BorsaNavHost(viewModel = viewModel)
+                    val marketViewModel: PortfolioViewModel = viewModel()
+                    val holdingsViewModel: HoldingsViewModel = viewModel()
+                    BorsaNavHost(marketViewModel = marketViewModel, holdingsViewModel = holdingsViewModel)
                 }
             }
         }

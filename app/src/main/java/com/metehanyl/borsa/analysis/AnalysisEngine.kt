@@ -137,6 +137,14 @@ object AnalysisEngine {
             else -> Recommendation.STRONG_SELL
         }
 
+        val (longTermOutlook, longTermReasons) = computeLongTermOutlook(
+            closes = closes,
+            sma200 = sma200,
+            rsi = rsi,
+            distFromHigh = distFromHigh,
+            distFromLow = distFromLow
+        )
+
         return Analysis(
             score = clampedScore,
             recommendation = recommendation,
@@ -149,7 +157,75 @@ object AnalysisEngine {
             momentum3M = momentum3M,
             volatility = volatility,
             distanceFrom52wHighPct = distFromHigh,
-            distanceFrom52wLowPct = distFromLow
+            distanceFrom52wLowPct = distFromLow,
+            longTermOutlook = longTermOutlook,
+            longTermReasons = longTermReasons
         )
+    }
+
+    /**
+     * Kısa vadeli teknik skordan bağımsız olarak, fiyatın uzun vadeli yapısal
+     * konumuna (200 günlük ortalamanın eğimi, zirveden/dipten uzaklık) dayalı
+     * kaba bir "ileride değerlenme potansiyeli" tahmini üretir. Bir kağıt kısa
+     * vadede "Sat" derken uzun vadede "Yüksek" potansiyelli görünebilir.
+     */
+    private fun computeLongTermOutlook(
+        closes: List<Double>,
+        sma200: Double?,
+        rsi: Double?,
+        distFromHigh: Double?,
+        distFromLow: Double?
+    ): Pair<LongTermOutlook, List<String>> {
+        var points = 0
+        val reasons = mutableListOf<String>()
+
+        val earlierSma200 = if (sma200 != null && closes.size >= 242) {
+            TechnicalIndicators.sma(closes.dropLast(42), 200)
+        } else null
+
+        if (sma200 != null && earlierSma200 != null) {
+            if (sma200 > earlierSma200) {
+                points += 2
+                reasons += "200 günlük ortalama yükseliş eğiminde — uzun vadeli yapı sağlam."
+            } else {
+                points -= 2
+                reasons += "200 günlük ortalama düşüş eğiminde — uzun vadeli yapı zayıflıyor."
+            }
+        } else {
+            reasons += "Uzun vadeli trend eğimi için yeterli geçmiş veri yok, temkinli değerlendirildi."
+        }
+
+        if (distFromHigh != null) {
+            when {
+                distFromHigh <= -25 -> {
+                    points += 2
+                    reasons += "Fiyat 52 haftalık zirveden %${(-distFromHigh).let { "%.0f".format(it) }} uzakta — belirgin bir indirim/toparlanma payı var."
+                }
+                distFromHigh <= -10 -> {
+                    points += 1
+                    reasons += "Fiyat zirveden bir miktar geri çekilmiş durumda."
+                }
+            }
+        }
+
+        if (distFromLow != null && sma200 != null && earlierSma200 != null && sma200 > earlierSma200) {
+            if (distFromLow <= 15) {
+                points += 1
+                reasons += "Uzun vadeli trend hâlâ yukarı yönlüyken fiyat dip bölgesine yakın — yapısal fırsat olabilir."
+            }
+        }
+
+        if (rsi != null && rsi < 35 && sma200 != null && earlierSma200 != null && sma200 > earlierSma200) {
+            points += 1
+            reasons += "Kısa vadede aşırı satım var ama uzun vadeli trend hâlâ yukarı yönlü — tepki alımı ihtimali."
+        }
+
+        val outlook = when {
+            points >= 3 -> LongTermOutlook.HIGH
+            points >= 0 -> LongTermOutlook.MEDIUM
+            else -> LongTermOutlook.LOW
+        }
+
+        return outlook to reasons
     }
 }

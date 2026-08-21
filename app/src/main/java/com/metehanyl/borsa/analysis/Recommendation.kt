@@ -8,6 +8,17 @@ enum class Recommendation(val label: String, val shortLabel: String) {
     STRONG_SELL("Güçlü Satış Sinyali", "Güçlü Sat")
 }
 
+/**
+ * Kısa vadeli teknik sinyalden BAĞIMSIZ, fiyatın uzun vadeli yapısal konumuna
+ * dayalı kaba bir "ileride değerlenme potansiyeli" göstergesi. Örn. bir kağıt
+ * kısa vadede "Sat" sinyali verirken uzun vadede "Yüksek" potansiyel taşıyabilir.
+ */
+enum class LongTermOutlook(val label: String) {
+    HIGH("Yüksek"),
+    MEDIUM("Orta"),
+    LOW("Düşük")
+}
+
 data class Analysis(
     val score: Int,
     val recommendation: Recommendation,
@@ -20,5 +31,7 @@ data class Analysis(
     val momentum3M: Double?,
     val volatility: Double?,
     val distanceFrom52wHighPct: Double?,
-    val distanceFrom52wLowPct: Double?
+    val distanceFrom52wLowPct: Double?,
+    val longTermOutlook: LongTermOutlook,
+    val longTermReasons: List<String>
 )
