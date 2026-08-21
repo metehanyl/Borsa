@@ -15,7 +15,10 @@ alım/satım fırsatlarını skorlayıp sıralayan Android uygulaması.
 | 🇨🇳 Çin | Shanghai / Shenzhen + ADR | 600519.SS, BABA, JD |
 | 🇯🇵 Japonya | Tokyo Stock Exchange | 7203.T, 6758.T, 9984.T |
 
-Tam liste için `app/src/main/java/com/metehanyl/borsa/data/StockCatalog.kt`.
+Toplamda ~250 şirket/kağıt kapsanır. Tam liste için
+`app/src/main/java/com/metehanyl/borsa/data/StockCatalog.kt`. Listede olmayan
+bir kağıt varsa Portföyüm ekranından "Sembolü elle girin" ile ekleyebilirsiniz;
+uygulama o sembolü de otomatik izlemeye/analiz etmeye başlar.
 
 ## Veri kaynağı
 

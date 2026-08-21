@@ -39,7 +39,7 @@ class StockRepository {
             return@coroutineScope catalog.mapNotNull { info -> cache[info.symbol]?.let { QuoteResult.Success(it) } }
         }
 
-        val chunkSize = 8
+        val chunkSize = 12
         val fetched = ArrayList<QuoteResult>(toFetch.size)
         toFetch.chunked(chunkSize).forEach { chunk ->
             val deferred = chunk.map { info -> async { fetchOne(info) } }
