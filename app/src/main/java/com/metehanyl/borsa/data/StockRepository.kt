@@ -184,7 +184,8 @@ class StockRepository {
             volume = meta.regularMarketVolume,
             fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh,
             fiftyTwoWeekLow = meta.fiftyTwoWeekLow,
-            history = history
+            history = history,
+            open = history.lastOrNull()?.open
         )
     }
 }

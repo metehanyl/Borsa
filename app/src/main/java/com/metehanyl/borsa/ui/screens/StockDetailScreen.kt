@@ -258,17 +258,21 @@ private fun HoldingPositionCard(holding: Holding, quote: Quote) {
 @Composable
 private fun KeyStatsGrid(quote: Quote) {
     val stats = buildList {
+        quote.open?.let { add("Açılış" to formatPrice(it, quote.currency)) }
         add("Önceki Kapanış" to formatPrice(quote.previousClose, quote.currency))
         quote.dayHigh?.let { add("Günlük Yüksek" to formatPrice(it, quote.currency)) }
         quote.dayLow?.let { add("Günlük Düşük" to formatPrice(it, quote.currency)) }
+        quote.weeklyChangePercent?.let { add("Haftalık Değişim" to formatPercent(it)) }
         quote.fiftyTwoWeekHigh?.let { add("52 Hafta Yüksek" to formatPrice(it, quote.currency)) }
         quote.fiftyTwoWeekLow?.let { add("52 Hafta Düşük" to formatPrice(it, quote.currency)) }
-        quote.volume?.let { add("Hacim" to formatCompactNumber(it)) }
+        quote.volume?.let { add("Hacim (lot)" to formatCompactNumber(it)) }
         quote.marketCap?.let { add("Piyasa Değeri" to "${formatCompactNumber(it)} ${quote.currency}") }
         quote.trailingPE?.let { add("F/K Oranı" to "%.1f".format(it)) }
         quote.dividendYieldPct?.let { add("Temettü Verimi" to "%.2f%%".format(it)) }
         quote.epsTrailingTwelveMonths?.let { add("Hisse Başı Kâr (EPS)" to formatPrice(it, quote.currency)) }
+        quote.bid?.let { add("Alış Fiyatı" to formatPrice(it, quote.currency)) }
         quote.bidSize?.let { add("Alış Kuyruğu (lot)" to formatCompactNumber(it)) }
+        quote.ask?.let { add("Satış Fiyatı" to formatPrice(it, quote.currency)) }
         quote.askSize?.let { add("Satış Kuyruğu (lot)" to formatCompactNumber(it)) }
     }
 

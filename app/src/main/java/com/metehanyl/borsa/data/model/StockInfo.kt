@@ -45,8 +45,19 @@ data class Quote(
     val bid: Double? = null,
     val bidSize: Long? = null,
     val ask: Double? = null,
-    val askSize: Long? = null
+    val askSize: Long? = null,
+    /** Bugünkü açılış fiyatı (günlük mumun "open" değeri). */
+    val open: Double? = null
 ) {
     val changeAmount: Double get() = price - previousClose
     val changePercent: Double get() = if (previousClose != 0.0) (changeAmount / previousClose) * 100.0 else 0.0
+
+    /** Son ~5 işlem gününe (yaklaşık bir hafta) göre yüzde değişim. Yeterli geçmiş yoksa null. */
+    val weeklyChangePercent: Double?
+        get() {
+            if (history.size <= 5) return null
+            val past = history[history.size - 1 - 5].close
+            if (past == 0.0) return null
+            return ((price - past) / past) * 100.0
+        }
 }
