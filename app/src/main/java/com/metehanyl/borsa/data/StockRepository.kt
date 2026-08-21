@@ -47,12 +47,7 @@ class StockRepository {
 
     suspend fun fetchOne(info: StockInfo): QuoteResult {
         return try {
-            val response = try {
-                NetworkModule.primaryApi.getChart(info.symbol)
-            } catch (primaryError: Exception) {
-                if (primaryError is CancellationException) throw primaryError
-                NetworkModule.fallbackApi.getChart(info.symbol)
-            }
+            val response = NetworkModule.getChartWithFallback(info.symbol)
 
             val result = response.chart.result?.firstOrNull()
                 ?: return QuoteResult.Failure(info, response.chart.error?.description ?: "Veri bulunamadı")
