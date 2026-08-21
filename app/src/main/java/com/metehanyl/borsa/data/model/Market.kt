@@ -1,6 +1,9 @@
 package com.metehanyl.borsa.data.model
 
+import kotlinx.serialization.Serializable
+
 /** Uygulamanın kapsadığı 7 ülke borsası. */
+@Serializable
 enum class Market(
     val displayName: String,
     val countryFlag: String,

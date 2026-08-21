@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.metehanyl.borsa.analysis.Recommendation
 import com.metehanyl.borsa.data.StockCatalog
 import com.metehanyl.borsa.data.model.Holding
+import com.metehanyl.borsa.data.model.Market
 import com.metehanyl.borsa.data.model.StockInfo
 import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.StockEntry
@@ -56,6 +60,11 @@ import com.metehanyl.borsa.ui.components.formatPercent
 import com.metehanyl.borsa.ui.components.formatPrice
 import com.metehanyl.borsa.ui.theme.BuyGreen
 import com.metehanyl.borsa.ui.theme.SellRed
+
+/** Kataloğun dışında elle eklenen kağıtlar için kullanılan sektör etiketi. */
+private const val CUSTOM_SECTOR = "Kullanıcı Eklentisi"
+
+private fun isCustomHolding(symbol: String): Boolean = StockCatalog.all.none { it.symbol == symbol }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +76,14 @@ fun HoldingsScreen(
     val marketState by marketViewModel.uiState.collectAsState()
     val holdings by holdingsViewModel.holdings.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+
+    // Uygulama yeniden açıldığında, kataloğun dışında elle eklenmiş kağıtların
+    // fiyatlarının da tekrar çekilmeye başlanmasını sağlar.
+    LaunchedEffect(holdings) {
+        holdings.filter { isCustomHolding(it.symbol) }.forEach { h ->
+            marketViewModel.trackSymbol(StockInfo(h.symbol, h.name, h.market, CUSTOM_SECTOR))
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -126,8 +143,9 @@ fun HoldingsScreen(
     if (showAddDialog) {
         AddHoldingDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { symbol, quantity, cost, date, note ->
-                holdingsViewModel.addHolding(symbol, quantity, cost, date, note)
+            onConfirm = { info, quantity, cost, date, note ->
+                holdingsViewModel.addHolding(info, quantity, cost, date, note)
+                if (isCustomHolding(info.symbol)) marketViewModel.trackSymbol(info)
                 showAddDialog = false
             }
         )
@@ -269,10 +287,14 @@ private fun holdingVerdictText(pnlPct: Double?, recommendation: Recommendation):
 @Composable
 private fun AddHoldingDialog(
     onDismiss: () -> Unit,
-    onConfirm: (symbol: String, quantity: Double, cost: Double, dateLabel: String, note: String) -> Unit
+    onConfirm: (info: StockInfo, quantity: Double, cost: Double, dateLabel: String, note: String) -> Unit
 ) {
     var selectedSymbol by remember { mutableStateOf<StockInfo?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var manualEntryMode by remember { mutableStateOf(false) }
+    var manualSymbol by remember { mutableStateOf("") }
+    var manualName by remember { mutableStateOf("") }
+    var manualMarket by remember { mutableStateOf(Market.US) }
     var quantityText by remember { mutableStateOf("") }
     var costText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
@@ -284,9 +306,13 @@ private fun AddHoldingDialog(
         }.take(8)
     }
 
+    val current: StockInfo? = selectedSymbol ?: if (manualEntryMode && manualSymbol.isNotBlank()) {
+        StockInfo(manualSymbol.trim().uppercase(), manualName.ifBlank { manualSymbol.trim().uppercase() }, manualMarket, CUSTOM_SECTOR)
+    } else null
+
     val quantity = quantityText.replace(",", ".").toDoubleOrNull()
     val cost = costText.replace(",", ".").toDoubleOrNull()
-    val canConfirm = selectedSymbol != null && quantity != null && quantity > 0 && cost != null && cost > 0
+    val canConfirm = current != null && quantity != null && quantity > 0 && cost != null && cost > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -295,11 +321,10 @@ private fun AddHoldingDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = 460.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                val current = selectedSymbol
-                if (current == null) {
+                if (selectedSymbol == null && !manualEntryMode) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -321,15 +346,66 @@ private fun AddHoldingDialog(
                                 .padding(vertical = 10.dp)
                         )
                     }
-                } else {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { manualEntryMode = true }) {
+                        Text("Aradığınız kağıt listede yok mu? Sembolü elle girin")
+                    }
+                } else if (selectedSymbol == null && manualEntryMode) {
+                    Text(
+                        "Kağıdı Yahoo Finance sembolüyle elle ekleyin (ör. ARM, UMC, TSM, 2330.TW). " +
+                            "Sembolün doğru olduğundan siz emin olmalısınız.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    OutlinedTextField(
+                        value = manualSymbol,
+                        onValueChange = { manualSymbol = it },
+                        label = { Text("Sembol (ör. UMC)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = manualName,
+                        onValueChange = { manualName = it },
+                        label = { Text("Şirket adı (opsiyonel)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("Piyasa", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        items(Market.entries) { market ->
+                            FilterChip(
+                                selected = manualMarket == market,
+                                onClick = { manualMarket = market },
+                                label = { Text("${market.countryFlag} ${market.currencySymbol}") }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { manualEntryMode = false; manualSymbol = "" }) {
+                        Text("Aramaya dön")
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                val resolved = current
+                if (resolved != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "${current.market.countryFlag} ${current.symbol} — ${current.name}",
+                            "${resolved.market.countryFlag} ${resolved.symbol} — ${resolved.name}",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = { selectedSymbol = null }) { Text("Değiştir") }
+                        TextButton(onClick = {
+                            selectedSymbol = null
+                            manualEntryMode = false
+                            manualSymbol = ""
+                            manualName = ""
+                        }) { Text("Değiştir") }
                     }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
@@ -344,7 +420,7 @@ private fun AddHoldingDialog(
                     OutlinedTextField(
                         value = costText,
                         onValueChange = { costText = it },
-                        label = { Text("Ortalama alış fiyatı (${current.market.currencySymbol})") },
+                        label = { Text("Ortalama alış fiyatı (${resolved.market.currencySymbol})") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
@@ -372,10 +448,10 @@ private fun AddHoldingDialog(
             TextButton(
                 enabled = canConfirm,
                 onClick = {
-                    val info = selectedSymbol ?: return@TextButton
+                    val info = current ?: return@TextButton
                     val q = quantity ?: return@TextButton
                     val c = cost ?: return@TextButton
-                    onConfirm(info.symbol, q, c, dateText.ifBlank { "-" }, noteText)
+                    onConfirm(info, q, c, dateText.ifBlank { "-" }, noteText)
                 }
             ) { Text("Ekle") }
         },

@@ -24,25 +24,37 @@ class StockRepository {
     private val cacheTtlMillis = 5 * 60 * 1000L
     private var lastFetchAt = 0L
 
-    /** Tüm katalogdaki sembolleri sınırlı eşzamanlılıkla çeker. */
-    suspend fun fetchAll(forceRefresh: Boolean = false): List<QuoteResult> = coroutineScope {
+    /**
+     * Verilen katalogdaki sembolleri sınırlı eşzamanlılıkla çeker. Önbellek hâlâ
+     * tazeyse ve daha önce çekilmiş sembollerse yeniden ağ isteği atmaz; kataloğa
+     * sonradan eklenen (ör. kullanıcının elle izlemeye başladığı) semboller varsa
+     * onları TTL'den bağımsız olarak çeker.
+     */
+    suspend fun fetchAll(catalog: List<StockInfo>, forceRefresh: Boolean = false): List<QuoteResult> = coroutineScope {
         val now = System.currentTimeMillis()
-        if (!forceRefresh && cache.isNotEmpty() && (now - lastFetchAt) < cacheTtlMillis) {
-            return@coroutineScope cache.values.map { QuoteResult.Success(it) }
+        val cacheFresh = !forceRefresh && (now - lastFetchAt) < cacheTtlMillis
+        val toFetch = if (cacheFresh) catalog.filter { it.symbol !in cache } else catalog
+
+        if (toFetch.isEmpty()) {
+            return@coroutineScope catalog.mapNotNull { info -> cache[info.symbol]?.let { QuoteResult.Success(it) } }
         }
 
         val chunkSize = 8
-        val results = ArrayList<QuoteResult>(StockCatalog.all.size)
-        StockCatalog.all.chunked(chunkSize).forEach { chunk ->
+        val fetched = ArrayList<QuoteResult>(toFetch.size)
+        toFetch.chunked(chunkSize).forEach { chunk ->
             val deferred = chunk.map { info -> async { fetchOne(info) } }
-            results += deferred.map { it.await() }
+            fetched += deferred.map { it.await() }
         }
 
         cacheMutex.withLock {
-            results.filterIsInstance<QuoteResult.Success>().forEach { cache[it.quote.info.symbol] = it.quote }
+            fetched.filterIsInstance<QuoteResult.Success>().forEach { cache[it.quote.info.symbol] = it.quote }
             lastFetchAt = System.currentTimeMillis()
         }
-        results
+
+        val fetchedSymbols = toFetch.map { it.symbol }.toSet()
+        val fromCache = catalog.filter { it.symbol !in fetchedSymbols }
+            .mapNotNull { info -> cache[info.symbol]?.let { QuoteResult.Success(it) } }
+        fetched + fromCache
     }
 
     suspend fun fetchOne(info: StockInfo): QuoteResult {

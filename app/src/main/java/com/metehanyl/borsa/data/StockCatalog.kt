@@ -21,6 +21,8 @@ object StockCatalog {
         add(StockInfo("JPM", "JPMorgan Chase & Co.", Market.US, "Bankacılık"))
         add(StockInfo("JNJ", "Johnson & Johnson", Market.US, "Sağlık"))
         add(StockInfo("XOM", "Exxon Mobil Corporation", Market.US, "Enerji"))
+        add(StockInfo("ARM", "Arm Holdings plc (ADR)", Market.US, "Yarı İletken"))
+        add(StockInfo("UMC", "United Microelectronics Corp (ADR)", Market.US, "Yarı İletken"))
 
         // Almanya (XETRA / Frankfurt)
         add(StockInfo("SAP.DE", "SAP SE", Market.GERMANY, "Yazılım"))

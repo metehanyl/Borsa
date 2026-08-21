@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.metehanyl.borsa.analysis.AnalysisEngine
 import com.metehanyl.borsa.data.QuoteResult
+import com.metehanyl.borsa.data.StockCatalog
 import com.metehanyl.borsa.data.StockRepository
 import com.metehanyl.borsa.data.model.Market
+import com.metehanyl.borsa.data.model.StockInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +48,9 @@ class PortfolioViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(PortfolioUiState())
     val uiState: StateFlow<PortfolioUiState> = _uiState.asStateFlow()
 
+    /** Kullanıcının, hazır kataloğun dışında elle izlemeye başladığı semboller (ör. Portföyüm'e eklenen ama listede olmayan bir kağıt). */
+    private val extraStockInfo = linkedMapOf<String, StockInfo>()
+
     init {
         load(forceRefresh = false)
     }
@@ -57,7 +62,8 @@ class PortfolioViewModel : ViewModel() {
                 isRefreshing = _uiState.value.entries.isNotEmpty(),
                 errorMessage = null
             )
-            val results = repository.fetchAll(forceRefresh)
+            val catalog = StockCatalog.all + extraStockInfo.values
+            val results = repository.fetchAll(catalog, forceRefresh)
             val successes = results.filterIsInstance<QuoteResult.Success>().map { it.quote }
             val failures = results.filterIsInstance<QuoteResult.Failure>()
 
@@ -73,6 +79,32 @@ class PortfolioViewModel : ViewModel() {
                     "Piyasa verisi alınamadı. İnternet bağlantınızı kontrol edip tekrar deneyin."
                 } else null
             )
+        }
+    }
+
+    /**
+     * Hazır katalogda olmayan bir sembolü (ör. kullanıcının Portföyüm'e elle
+     * eklediği bir kağıt) izlemeye ve analiz etmeye başlar. Sembol zaten
+     * izleniyorsa hiçbir şey yapmaz.
+     */
+    fun trackSymbol(info: StockInfo) {
+        if (extraStockInfo.containsKey(info.symbol)) return
+        if (StockCatalog.all.any { it.symbol == info.symbol }) return // zaten hazır katalogda, tekrar eklenmesin
+        extraStockInfo[info.symbol] = info
+        viewModelScope.launch {
+            when (val result = repository.fetchOne(info)) {
+                is QuoteResult.Success -> {
+                    val entry = StockEntry(result.quote, AnalysisEngine.analyze(result.quote))
+                    _uiState.value = _uiState.value.copy(
+                        entries = _uiState.value.entries.filterNot { it.quote.info.symbol == info.symbol } + entry
+                    )
+                }
+                is QuoteResult.Failure -> {
+                    _uiState.value = _uiState.value.copy(
+                        failedSymbols = (_uiState.value.failedSymbols + info.symbol).distinct()
+                    )
+                }
+            }
         }
     }
 

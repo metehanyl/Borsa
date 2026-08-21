@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.metehanyl.borsa.data.PortfolioStore
 import com.metehanyl.borsa.data.model.Holding
+import com.metehanyl.borsa.data.model.StockInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,10 +25,12 @@ class HoldingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addHolding(symbol: String, quantity: Double, averageCost: Double, purchaseDateLabel: String, note: String) {
+    fun addHolding(info: StockInfo, quantity: Double, averageCost: Double, purchaseDateLabel: String, note: String) {
         val holding = Holding(
             id = UUID.randomUUID().toString(),
-            symbol = symbol,
+            symbol = info.symbol,
+            name = info.name,
+            market = info.market,
             quantity = quantity,
             averageCost = averageCost,
             purchaseDateLabel = purchaseDateLabel,
