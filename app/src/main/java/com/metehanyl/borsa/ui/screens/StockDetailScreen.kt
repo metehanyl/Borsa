@@ -138,7 +138,7 @@ fun StockDetailScreen(
                 item { LongTermOutlookCard(analysis) }
                 item {
                     CommentaryCard(
-                        text = CommentarySynthesizer.synthesize(quote.info.name, analysis, newsTilt)
+                        text = CommentarySynthesizer.synthesize(quote.info.name, quote, analysis, newsTilt)
                     )
                 }
             } else {
@@ -242,6 +242,10 @@ private fun KeyStatsGrid(quote: Quote) {
         quote.fiftyTwoWeekHigh?.let { add("52 Hafta Yüksek" to formatPrice(it, quote.currency)) }
         quote.fiftyTwoWeekLow?.let { add("52 Hafta Düşük" to formatPrice(it, quote.currency)) }
         quote.volume?.let { add("Hacim" to formatCompactNumber(it)) }
+        quote.marketCap?.let { add("Piyasa Değeri" to "${formatCompactNumber(it)} ${quote.currency}") }
+        quote.trailingPE?.let { add("F/K Oranı" to "%.1f".format(it)) }
+        quote.dividendYieldPct?.let { add("Temettü Verimi" to "%.2f%%".format(it)) }
+        quote.epsTrailingTwelveMonths?.let { add("Hisse Başı Kâr (EPS)" to formatPrice(it, quote.currency)) }
     }
 
     Column(
@@ -429,9 +433,9 @@ private fun NewsSection(loading: Boolean, items: List<NewsItem>, tilt: NewsTilt?
 private fun DisclaimerCard() {
     Text(
         text = "Bu ekrandaki skor, uzun vadeli görünüm ve yorumlar; hareketli ortalama, RSI, MACD, momentum, " +
-            "52 haftalık aralık ve haber başlıklarının kural tabanlı biçimde ağırlıklandırılmasıyla cihazınızda " +
-            "otomatik üretilir. Yatırım danışmanlığı değildir; yatırım kararlarınızı kendi araştırmanız ve risk " +
-            "toleransınıza göre verin.",
+            "52 haftalık aralık, F/K oranı, temettü verimi ve haber başlıklarının kural tabanlı biçimde " +
+            "ağırlıklandırılmasıyla cihazınızda otomatik üretilir. Bir yapay zekanın canlı yorumu değildir. " +
+            "Yatırım danışmanlığı değildir; yatırım kararlarınızı kendi araştırmanız ve risk toleransınıza göre verin.",
         fontSize = 11.sp,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
         modifier = Modifier.padding(vertical = 8.dp)

@@ -1,6 +1,8 @@
 package com.metehanyl.borsa.data.remote
 
 import com.metehanyl.borsa.data.model.YahooChartResponse
+import com.metehanyl.borsa.data.model.YahooQuoteResult
+import com.metehanyl.borsa.data.model.YahooQuoteSummaryResponse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /**
@@ -62,6 +65,41 @@ object NetworkModule {
             throw e
         } catch (e: Exception) {
             getChart(symbol, "query2.finance.yahoo.com")
+        }
+    }
+
+    private suspend fun getQuoteSummary(symbolsCsv: String, host: String): YahooQuoteSummaryResponse =
+        withContext(Dispatchers.IO) {
+            val url = "https://$host/v7/finance/quote?symbols=$symbolsCsv"
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string() ?: throw IOException("Boş yanıt")
+                json.decodeFromString<YahooQuoteSummaryResponse>(bodyString)
+            }
+        }
+
+    /**
+     * Birden çok sembol için tek istekte F/K oranı, piyasa değeri, temettü
+     * verimi gibi temel finansal alanları çeker. Herhangi bir hata durumunda
+     * (ör. beklenmedik alan adı/tipi) sessizce boş liste döner — bu, sadece
+     * "Temel Bilgiler" zenginleştirmesini atlar, uygulamanın geri kalanını
+     * etkilemez.
+     */
+    suspend fun getQuoteSummariesWithFallback(symbols: List<String>): List<YahooQuoteResult> {
+        if (symbols.isEmpty()) return emptyList()
+        val csv = symbols.joinToString(",") { URLEncoder.encode(it, "UTF-8") }
+        return try {
+            getQuoteSummary(csv, "query1.finance.yahoo.com").quoteResponse.result.orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            try {
+                getQuoteSummary(csv, "query2.finance.yahoo.com").quoteResponse.result.orEmpty()
+            } catch (e2: CancellationException) {
+                throw e2
+            } catch (e2: Exception) {
+                emptyList()
+            }
         }
     }
 }

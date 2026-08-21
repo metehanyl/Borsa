@@ -4,6 +4,7 @@ import com.metehanyl.borsa.data.model.PricePoint
 import com.metehanyl.borsa.data.model.Quote
 import com.metehanyl.borsa.data.model.StockInfo
 import com.metehanyl.borsa.data.model.YahooChartResult
+import com.metehanyl.borsa.data.model.YahooQuoteResult
 import com.metehanyl.borsa.data.remote.NetworkModule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -46,15 +47,55 @@ class StockRepository {
             fetched += deferred.map { it.await() }
         }
 
+        val enrichedFetched = enrichWithFundamentals(fetched)
+
         cacheMutex.withLock {
-            fetched.filterIsInstance<QuoteResult.Success>().forEach { cache[it.quote.info.symbol] = it.quote }
+            enrichedFetched.filterIsInstance<QuoteResult.Success>().forEach { cache[it.quote.info.symbol] = it.quote }
             lastFetchAt = System.currentTimeMillis()
         }
 
         val fetchedSymbols = toFetch.map { it.symbol }.toSet()
         val fromCache = catalog.filter { it.symbol !in fetchedSymbols }
             .mapNotNull { info -> cache[info.symbol]?.let { QuoteResult.Success(it) } }
-        fetched + fromCache
+        enrichedFetched + fromCache
+    }
+
+    /**
+     * Fiyat/grafik verisi başarıyla çekilen semboller için F/K oranı, piyasa
+     * değeri, temettü verimi gibi temel finansal alanları toplu istekle çekip
+     * Quote'lara ekler. Bu adım tamamen isteğe bağlıdır — herhangi bir hata
+     * sessizce yutulur ve girdi olduğu gibi döndürülür (uygulamanın geri
+     * kalanını etkilemez).
+     */
+    private suspend fun enrichWithFundamentals(results: List<QuoteResult>): List<QuoteResult> {
+        val successes = results.filterIsInstance<QuoteResult.Success>()
+        if (successes.isEmpty()) return results
+
+        val fundamentalsBySymbol = HashMap<String, YahooQuoteResult>()
+        successes.map { it.quote.info.symbol }.chunked(50).forEach { chunk ->
+            val batch = try {
+                NetworkModule.getQuoteSummariesWithFallback(chunk)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+            batch.forEach { fundamentalsBySymbol[it.symbol] = it }
+        }
+        if (fundamentalsBySymbol.isEmpty()) return results
+
+        return results.map { result ->
+            if (result !is QuoteResult.Success) return@map result
+            val f = fundamentalsBySymbol[result.quote.info.symbol] ?: return@map result
+            QuoteResult.Success(
+                result.quote.copy(
+                    marketCap = f.marketCap,
+                    trailingPE = f.trailingPE,
+                    dividendYieldPct = f.dividendYield,
+                    epsTrailingTwelveMonths = f.epsTrailingTwelveMonths
+                )
+            )
+        }
     }
 
     suspend fun fetchOne(info: StockInfo): QuoteResult {

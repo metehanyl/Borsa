@@ -29,7 +29,15 @@ data class Quote(
     val volume: Long?,
     val fiftyTwoWeekHigh: Double?,
     val fiftyTwoWeekLow: Double?,
-    val history: List<PricePoint>
+    val history: List<PricePoint>,
+    /** Piyasa değeri (şirketin işlem gördüğü para biriminde). */
+    val marketCap: Long? = null,
+    /** Fiyat / Kazanç (F/K) oranı — son 12 aylık kâr üzerinden. */
+    val trailingPE: Double? = null,
+    /** Temettü verimi, yüzde olarak (ör. 2.5 -> %2.5). */
+    val dividendYieldPct: Double? = null,
+    /** Hisse başına kâr (son 12 ay). */
+    val epsTrailingTwelveMonths: Double? = null
 ) {
     val changeAmount: Double get() = price - previousClose
     val changePercent: Double get() = if (previousClose != 0.0) (changeAmount / previousClose) * 100.0 else 0.0
