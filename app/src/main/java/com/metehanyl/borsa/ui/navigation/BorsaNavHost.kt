@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -22,16 +23,19 @@ import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.holdings.HoldingsScreen
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 import com.metehanyl.borsa.ui.screens.MarketsScreen
+import com.metehanyl.borsa.ui.screens.RecommendationsScreen
 import com.metehanyl.borsa.ui.screens.StockDetailScreen
 
 private const val ROUTE_MARKETS = "markets"
 private const val ROUTE_HOLDINGS = "holdings"
+private const val ROUTE_RECOMMENDATIONS = "recommendations"
 private const val ROUTE_DETAIL = "detail/{symbol}"
 
 private data class BottomDestination(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 private val bottomDestinations = listOf(
     BottomDestination(ROUTE_MARKETS, "Piyasalar", Icons.Filled.ShowChart),
+    BottomDestination(ROUTE_RECOMMENDATIONS, "Önerilerim", Icons.Filled.Star),
     BottomDestination(ROUTE_HOLDINGS, "Portföyüm", Icons.Filled.AccountBalanceWallet)
 )
 
@@ -76,6 +80,12 @@ fun BorsaNavHost(
         ) {
             composable(ROUTE_MARKETS) {
                 MarketsScreen(
+                    viewModel = marketViewModel,
+                    onStockClick = { symbol -> navController.navigate("detail/$symbol") }
+                )
+            }
+            composable(ROUTE_RECOMMENDATIONS) {
+                RecommendationsScreen(
                     viewModel = marketViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
