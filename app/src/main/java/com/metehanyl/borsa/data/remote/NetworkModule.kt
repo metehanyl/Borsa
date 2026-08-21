@@ -46,25 +46,30 @@ object NetworkModule {
             .build()
     }
 
-    private suspend fun getChart(symbol: String, host: String): YahooChartResponse = withContext(Dispatchers.IO) {
-        val url = "https://$host/v8/finance/chart/$symbol?range=1y&interval=1d&includePrePost=false"
-        val request = Request.Builder().url(url).build()
-        client.newCall(request).execute().use { response ->
-            val bodyString = response.body?.string() ?: throw IOException("Boş yanıt: $symbol")
-            // Yahoo, geçersiz sembollerde bile 200/4xx ile birlikte chart.error alanı taşıyan
-            // bir JSON gövdesi döndürebilir; bu yüzden yanıt kodundan bağımsız parse ediyoruz.
-            json.decodeFromString<YahooChartResponse>(bodyString)
+    private suspend fun getChart(symbol: String, host: String, range: String, interval: String): YahooChartResponse =
+        withContext(Dispatchers.IO) {
+            val url = "https://$host/v8/finance/chart/$symbol?range=$range&interval=$interval&includePrePost=false"
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string() ?: throw IOException("Boş yanıt: $symbol")
+                // Yahoo, geçersiz sembollerde bile 200/4xx ile birlikte chart.error alanı taşıyan
+                // bir JSON gövdesi döndürebilir; bu yüzden yanıt kodundan bağımsız parse ediyoruz.
+                json.decodeFromString<YahooChartResponse>(bodyString)
+            }
         }
-    }
 
-    /** query1'i dener, başarısız olursa query2'ye düşer. */
-    suspend fun getChartWithFallback(symbol: String): YahooChartResponse {
+    /**
+     * query1'i dener, başarısız olursa query2'ye düşer.
+     * @param range/interval varsayılan olarak 1 yıllık günlük mumlar (teknik analiz için);
+     * gün içi hacim için ör. range="5d", interval="60m" geçilebilir.
+     */
+    suspend fun getChartWithFallback(symbol: String, range: String = "1y", interval: String = "1d"): YahooChartResponse {
         return try {
-            getChart(symbol, "query1.finance.yahoo.com")
+            getChart(symbol, "query1.finance.yahoo.com", range, interval)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            getChart(symbol, "query2.finance.yahoo.com")
+            getChart(symbol, "query2.finance.yahoo.com", range, interval)
         }
     }
 

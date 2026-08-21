@@ -25,5 +25,11 @@ data class YahooQuoteResult(
     val trailingPE: Double? = null,
     val forwardPE: Double? = null,
     val dividendYield: Double? = null,
-    val epsTrailingTwelveMonths: Double? = null
+    val epsTrailingTwelveMonths: Double? = null,
+    /** En iyi alış fiyatı ve bu fiyattaki lot (hisse adedi) kuyruğu — kişi sayısı değildir. */
+    val bid: Double? = null,
+    val bidSize: Long? = null,
+    /** En iyi satış fiyatı ve bu fiyattaki lot (hisse adedi) kuyruğu — kişi sayısı değildir. */
+    val ask: Double? = null,
+    val askSize: Long? = null
 )

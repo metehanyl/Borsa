@@ -122,4 +122,10 @@ class PortfolioViewModel : ViewModel() {
     }
 
     fun entryFor(symbol: String): StockEntry? = _uiState.value.entries.firstOrNull { it.quote.info.symbol == symbol }
+
+    /**
+     * Son birkaç günün saatlik hacim verisini çeker (detay ekranındaki
+     * "Saatlik İşlem Hacmi" bölümü için, isteğe bağlı/gecikmeli yükleme).
+     */
+    suspend fun fetchIntradayVolume(symbol: String) = repository.fetchIntradayVolume(symbol)
 }

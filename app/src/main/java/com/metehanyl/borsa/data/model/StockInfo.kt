@@ -37,7 +37,15 @@ data class Quote(
     /** Temettü verimi, yüzde olarak (ör. 2.5 -> %2.5). */
     val dividendYieldPct: Double? = null,
     /** Hisse başına kâr (son 12 ay). */
-    val epsTrailingTwelveMonths: Double? = null
+    val epsTrailingTwelveMonths: Double? = null,
+    /**
+     * Anlık alış/satış emir kuyruğu (lot/hisse adedi cinsinden) — "kaç kişi bu
+     * hissede var" DEĞİLDİR, en iyi fiyat seviyesindeki bekleyen hisse adedidir.
+     */
+    val bid: Double? = null,
+    val bidSize: Long? = null,
+    val ask: Double? = null,
+    val askSize: Long? = null
 ) {
     val changeAmount: Double get() = price - previousClose
     val changePercent: Double get() = if (previousClose != 0.0) (changeAmount / previousClose) * 100.0 else 0.0

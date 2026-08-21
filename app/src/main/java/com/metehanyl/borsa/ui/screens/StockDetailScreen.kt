@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,6 +49,7 @@ import com.metehanyl.borsa.analysis.NewsAnalyzer
 import com.metehanyl.borsa.analysis.NewsSentiment
 import com.metehanyl.borsa.analysis.NewsTilt
 import com.metehanyl.borsa.data.model.Holding
+import com.metehanyl.borsa.data.model.IntradayPoint
 import com.metehanyl.borsa.data.model.NewsItem
 import com.metehanyl.borsa.data.model.Quote
 import com.metehanyl.borsa.data.remote.NewsService
@@ -57,6 +59,7 @@ import com.metehanyl.borsa.ui.components.PriceChart
 import com.metehanyl.borsa.ui.components.ScoreBadge
 import com.metehanyl.borsa.ui.components.colorFor
 import com.metehanyl.borsa.ui.components.formatCompactNumber
+import com.metehanyl.borsa.ui.components.formatHourLabel
 import com.metehanyl.borsa.ui.components.formatPercent
 import com.metehanyl.borsa.ui.components.formatPrice
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
@@ -85,6 +88,17 @@ fun StockDetailScreen(
         val query = entry?.quote?.info?.name ?: symbol
         newsItems = NewsService.search(query, language = "tr")
         newsLoading = false
+    }
+
+    var intradayPoints by remember(symbol) { mutableStateOf<List<IntradayPoint>>(emptyList()) }
+    var intradayLoading by remember(symbol) { mutableStateOf(true) }
+    var selectedIntradayIndex by remember(symbol) { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(symbol) {
+        intradayLoading = true
+        intradayPoints = viewModel.fetchIntradayVolume(symbol)
+        selectedIntradayIndex = null
+        intradayLoading = false
     }
 
     Scaffold(
@@ -133,6 +147,14 @@ fun StockDetailScreen(
                 )
             }
             item { KeyStatsGrid(quote) }
+            item {
+                IntradayVolumeSection(
+                    loading = intradayLoading,
+                    points = intradayPoints,
+                    selectedIndex = selectedIntradayIndex,
+                    onSelect = { selectedIntradayIndex = it }
+                )
+            }
             if (analysis != null) {
                 item { AnalysisSection(analysis) }
                 item { LongTermOutlookCard(analysis) }
@@ -246,6 +268,8 @@ private fun KeyStatsGrid(quote: Quote) {
         quote.trailingPE?.let { add("F/K Oranı" to "%.1f".format(it)) }
         quote.dividendYieldPct?.let { add("Temettü Verimi" to "%.2f%%".format(it)) }
         quote.epsTrailingTwelveMonths?.let { add("Hisse Başı Kâr (EPS)" to formatPrice(it, quote.currency)) }
+        quote.bidSize?.let { add("Alış Kuyruğu (lot)" to formatCompactNumber(it)) }
+        quote.askSize?.let { add("Satış Kuyruğu (lot)" to formatCompactNumber(it)) }
     }
 
     Column(
@@ -262,6 +286,94 @@ private fun KeyStatsGrid(quote: Quote) {
                         Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
                         Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntradayVolumeSection(
+    loading: Boolean,
+    points: List<IntradayPoint>,
+    selectedIndex: Int?,
+    onSelect: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Text("Saatlik İşlem Hacmi", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Text(
+            "Bir saat seçtiğinizde o saatte el değiştiren hisse adedini görürsünüz. Bu, kişi ya da " +
+                "işlem sayısı DEĞİLDİR — hiçbir borsa \"şu an bu hissede kaç kişi var\" bilgisini " +
+                "yayımlamaz; burada gösterilen tamamen el değiştiren hisse adedidir (hacim).",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+        )
+        when {
+            loading -> CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+            points.size < 2 -> Text(
+                "Gün içi hacim verisi şu an alınamadı.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            else -> {
+                val latestIndex = points.size - 1
+                val effectiveIndex = (selectedIndex ?: latestIndex).coerceIn(0, latestIndex)
+                val selectedPoint = points[effectiveIndex]
+                val latestPoint = points[latestIndex]
+                val avgVolume = points.map { it.volume }.average()
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(points.size) { index ->
+                        val point = points[index]
+                        val isSelected = index == effectiveIndex
+                        Column(
+                            modifier = Modifier
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { onSelect(index) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                formatHourLabel(point.timestampMillis),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                formatCompactNumber(point.volume),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                val ratio = if (avgVolume > 0) selectedPoint.volume / avgVolume else 0.0
+                Text(
+                    "${formatHourLabel(selectedPoint.timestampMillis)} — ${formatCompactNumber(selectedPoint.volume)} hisse el değiştirdi " +
+                        "(gösterilen dönem ortalamasının ${"%.1f".format(ratio)}× katı).",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (effectiveIndex != latestIndex && latestPoint.volume != 0L) {
+                    val diffPct = ((selectedPoint.volume - latestPoint.volume).toDouble() / latestPoint.volume) * 100.0
+                    Text(
+                        "Şu anki ${formatHourLabel(latestPoint.timestampMillis)} saatiyle karşılaştırıldığında " +
+                            "${if (diffPct >= 0) "+" else ""}${"%.0f".format(diffPct)}%.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }
@@ -433,9 +545,11 @@ private fun NewsSection(loading: Boolean, items: List<NewsItem>, tilt: NewsTilt?
 private fun DisclaimerCard() {
     Text(
         text = "Bu ekrandaki skor, uzun vadeli görünüm ve yorumlar; hareketli ortalama, RSI, MACD, momentum, " +
-            "52 haftalık aralık, F/K oranı, temettü verimi ve haber başlıklarının kural tabanlı biçimde " +
-            "ağırlıklandırılmasıyla cihazınızda otomatik üretilir. Bir yapay zekanın canlı yorumu değildir. " +
-            "Yatırım danışmanlığı değildir; yatırım kararlarınızı kendi araştırmanız ve risk toleransınıza göre verin.",
+            "52 haftalık aralık, işlem hacmi, F/K oranı, temettü verimi ve haber başlıklarının kural tabanlı " +
+            "biçimde ağırlıklandırılmasıyla cihazınızda otomatik üretilir. Bir yapay zekanın canlı yorumu " +
+            "değildir. Hacim/kuyruk verileri kişi sayısı değil, el değiştiren/bekleyen hisse adedidir — " +
+            "hiçbir borsa bir kağıtta o an kaç kişi olduğunu yayımlamaz. Yatırım danışmanlığı değildir; " +
+            "yatırım kararlarınızı kendi araştırmanız ve risk toleransınıza göre verin.",
         fontSize = 11.sp,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
         modifier = Modifier.padding(vertical = 8.dp)

@@ -128,6 +128,32 @@ object AnalysisEngine {
             }
         }
 
+        // 6) Hacim bileşeni (ağırlık: ±10 puan) — son işlem gününün hacmi 20 günlük
+        // ortalamaya göre ne kadar yüksek; bu, "kaç kişi işlem yaptı" değil, o gün
+        // el değiştiren hisse adedinin (kaç kişi olduğunu göstermez) ortalamaya oranıdır.
+        val volumes = quote.history.mapNotNull { it.volume }
+        if (volumes.size >= 21) {
+            val latestVolume = volumes.last()
+            val avgVolume20 = volumes.dropLast(1).takeLast(20).average()
+            if (avgVolume20 > 0) {
+                val ratio = latestVolume / avgVolume20
+                val risingPrice = momentum1M != null && momentum1M > 0
+                when {
+                    ratio >= 2.0 && risingPrice -> {
+                        score += 10
+                        reasons += "Hacim, 20 günlük ortalamanın ${"%.1f".format(ratio)} katı ve fiyat yükseliyor — güçlü alım ilgisi işareti."
+                    }
+                    ratio >= 2.0 && !risingPrice -> {
+                        score -= 10
+                        reasons += "Hacim, 20 günlük ortalamanın ${"%.1f".format(ratio)} katı ama fiyat yükselmiyor — satış baskısı/panik işareti olabilir."
+                    }
+                    ratio >= 1.3 -> {
+                        reasons += "Hacim ortalamanın üzerinde (${"%.1f".format(ratio)}×), ilgi artıyor."
+                    }
+                }
+            }
+        }
+
         val clampedScore = score.coerceIn(-100, 100)
         val recommendation = when {
             clampedScore >= 50 -> Recommendation.STRONG_BUY

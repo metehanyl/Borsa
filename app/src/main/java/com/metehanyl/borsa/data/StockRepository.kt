@@ -1,5 +1,6 @@
 package com.metehanyl.borsa.data
 
+import com.metehanyl.borsa.data.model.IntradayPoint
 import com.metehanyl.borsa.data.model.PricePoint
 import com.metehanyl.borsa.data.model.Quote
 import com.metehanyl.borsa.data.model.StockInfo
@@ -92,9 +93,39 @@ class StockRepository {
                     marketCap = f.marketCap,
                     trailingPE = f.trailingPE,
                     dividendYieldPct = f.dividendYield,
-                    epsTrailingTwelveMonths = f.epsTrailingTwelveMonths
+                    epsTrailingTwelveMonths = f.epsTrailingTwelveMonths,
+                    bid = f.bid,
+                    bidSize = f.bidSize,
+                    ask = f.ask,
+                    askSize = f.askSize
                 )
             )
+        }
+    }
+
+    /**
+     * Son birkaç günün saatlik (60 dakikalık) mumlarını çeker — "o saatte kaç
+     * hisse el değiştirdi" sorusuna gerçek bir cevap vermek için. Bu, "o saatte
+     * kaç kişi vardı" DEĞİLDİR; hiçbir borsa ya da Yahoo Finance bu bilgiyi
+     * yayımlamaz. Hata durumunda boş liste döner.
+     */
+    suspend fun fetchIntradayVolume(symbol: String): List<IntradayPoint> {
+        return try {
+            val response = NetworkModule.getChartWithFallback(symbol, range = "5d", interval = "60m")
+            val result = response.chart.result?.firstOrNull() ?: return emptyList()
+            val timestamps = result.timestamp.orEmpty()
+            val quotes = result.indicators.quote?.firstOrNull()
+            val volumes = quotes?.volume.orEmpty()
+            val closes = quotes?.close.orEmpty()
+            timestamps.indices.mapNotNull { i ->
+                val vol = volumes.getOrNull(i) ?: return@mapNotNull null
+                val close = closes.getOrNull(i) ?: return@mapNotNull null
+                IntradayPoint(timestampMillis = timestamps[i] * 1000L, volume = vol, close = close)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 

@@ -29,3 +29,10 @@ fun formatDate(timestampMillis: Long): String {
     val fmt = java.text.SimpleDateFormat("d MMM yyyy", Locale("tr", "TR"))
     return fmt.format(date)
 }
+
+/** Saat:dakika + kısa tarih (cihazın yerel saat dilimine göre). */
+fun formatHourLabel(timestampMillis: Long): String {
+    val date = java.util.Date(timestampMillis)
+    val fmt = java.text.SimpleDateFormat("d MMM HH:mm", Locale("tr", "TR"))
+    return fmt.format(date)
+}
