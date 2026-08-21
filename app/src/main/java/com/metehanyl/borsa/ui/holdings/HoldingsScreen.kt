@@ -143,8 +143,8 @@ fun HoldingsScreen(
     if (showAddDialog) {
         AddHoldingDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { info, quantity, cost, date, note ->
-                holdingsViewModel.addHolding(info, quantity, cost, date, note)
+            onConfirm = { info, quantity, investedAmount, cost, date, note ->
+                holdingsViewModel.addHolding(info, quantity, cost, date, note, investedAmount)
                 if (isCustomHolding(info.symbol)) marketViewModel.trackSymbol(info)
                 showAddDialog = false
             }
@@ -159,7 +159,8 @@ private fun PortfolioSummary(holdings: List<Holding>, entries: List<StockEntry>)
     val rows = holdings
         .mapNotNull { h ->
             val entry = entries.firstOrNull { it.quote.info.symbol == h.symbol } ?: return@mapNotNull null
-            CurrencyValue(entry.quote.currency, h.averageCost * h.quantity, entry.quote.price * h.quantity)
+            val qty = h.effectiveQuantity
+            CurrencyValue(entry.quote.currency, h.averageCost * qty, entry.quote.price * qty)
         }
         .groupBy { it.currency }
         .map { (currency, group) -> Triple(currency, group.sumOf { it.cost }, group.sumOf { it.value }) }
@@ -208,8 +209,9 @@ private fun PortfolioSummary(holdings: List<Holding>, entries: List<StockEntry>)
 @Composable
 private fun HoldingCard(holding: Holding, entry: StockEntry?, onClick: () -> Unit, onDelete: () -> Unit) {
     val quote = entry?.quote
-    val currentValue = quote?.price?.times(holding.quantity)
-    val costValue = holding.averageCost * holding.quantity
+    val qty = holding.effectiveQuantity
+    val currentValue = quote?.price?.times(qty)
+    val costValue = holding.averageCost * qty
     val pnl = currentValue?.minus(costValue)
     val pnlPct = if (currentValue != null && costValue != 0.0) (pnl!! / costValue) * 100.0 else null
 
@@ -224,8 +226,13 @@ private fun HoldingCard(holding: Holding, entry: StockEntry?, onClick: () -> Uni
             Text(quote?.info?.market?.countryFlag ?: "🌐", fontSize = 20.sp)
             Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(holding.symbol, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                val quantityLabel = if (holding.isAmountBased) {
+                    "≈ ${"%.4f".format(qty)} adet (${formatPrice(holding.investedAmount ?: 0.0, quote?.currency ?: "")} tutar bazlı)"
+                } else {
+                    "${holding.quantity.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() }} adet"
+                }
                 Text(
-                    "${holding.quantity} adet · Maliyet ${formatPrice(holding.averageCost, quote?.currency ?: "")}",
+                    "$quantityLabel · Maliyet ${formatPrice(holding.averageCost, quote?.currency ?: "")}",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -287,7 +294,7 @@ private fun holdingVerdictText(pnlPct: Double?, recommendation: Recommendation):
 @Composable
 private fun AddHoldingDialog(
     onDismiss: () -> Unit,
-    onConfirm: (info: StockInfo, quantity: Double, cost: Double, dateLabel: String, note: String) -> Unit
+    onConfirm: (info: StockInfo, quantity: Double, investedAmount: Double?, cost: Double, dateLabel: String, note: String) -> Unit
 ) {
     var selectedSymbol by remember { mutableStateOf<StockInfo?>(null) }
     var searchQuery by remember { mutableStateOf("") }
@@ -296,6 +303,7 @@ private fun AddHoldingDialog(
     var manualName by remember { mutableStateOf("") }
     var manualMarket by remember { mutableStateOf(Market.US) }
     var quantityText by remember { mutableStateOf("") }
+    var amountText by remember { mutableStateOf("") }
     var costText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
@@ -311,8 +319,11 @@ private fun AddHoldingDialog(
     } else null
 
     val quantity = quantityText.replace(",", ".").toDoubleOrNull()
+    val amount = amountText.replace(",", ".").toDoubleOrNull()
     val cost = costText.replace(",", ".").toDoubleOrNull()
-    val canConfirm = current != null && quantity != null && quantity > 0 && cost != null && cost > 0
+    val hasQuantity = quantity != null && quantity > 0
+    val hasAmount = amount != null && amount > 0
+    val canConfirm = current != null && cost != null && cost > 0 && (hasQuantity || hasAmount)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -411,7 +422,23 @@ private fun AddHoldingDialog(
                     OutlinedTextField(
                         value = quantityText,
                         onValueChange = { quantityText = it },
-                        label = { Text("Adet") },
+                        label = { Text("Adet (opsiyonel)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        "Kaç adet aldığınızı bilmiyorsanız (ör. birikim uygulamasından kısmi/tutar " +
+                            "bazlı aldıysanız) adeti boş bırakıp aşağıya yatırdığınız tutarı girin.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                    )
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it },
+                        label = { Text("Yatırım Tutarı (${resolved.market.currencySymbol}, opsiyonel)") },
+                        enabled = !hasQuantity,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
@@ -425,6 +452,14 @@ private fun AddHoldingDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (hasAmount && !hasQuantity && cost != null && cost > 0) {
+                        Text(
+                            "≈ ${"%.4f".format(amount!! / cost)} adete karşılık gelir (maliyetten türetilir).",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = dateText,
@@ -449,9 +484,10 @@ private fun AddHoldingDialog(
                 enabled = canConfirm,
                 onClick = {
                     val info = current ?: return@TextButton
-                    val q = quantity ?: return@TextButton
                     val c = cost ?: return@TextButton
-                    onConfirm(info, q, c, dateText.ifBlank { "-" }, noteText)
+                    val q = if (hasQuantity) quantity ?: 0.0 else 0.0
+                    val a = if (!hasQuantity && hasAmount) amount else null
+                    onConfirm(info, q, a, c, dateText.ifBlank { "-" }, noteText)
                 }
             ) { Text("Ekle") }
         },

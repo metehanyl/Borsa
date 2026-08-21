@@ -25,7 +25,14 @@ class HoldingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addHolding(info: StockInfo, quantity: Double, averageCost: Double, purchaseDateLabel: String, note: String) {
+    fun addHolding(
+        info: StockInfo,
+        quantity: Double,
+        averageCost: Double,
+        purchaseDateLabel: String,
+        note: String,
+        investedAmount: Double? = null
+    ) {
         val holding = Holding(
             id = UUID.randomUUID().toString(),
             symbol = info.symbol,
@@ -33,6 +40,7 @@ class HoldingsViewModel(application: Application) : AndroidViewModel(application
             market = info.market,
             quantity = quantity,
             averageCost = averageCost,
+            investedAmount = investedAmount,
             purchaseDateLabel = purchaseDateLabel,
             note = note
         )

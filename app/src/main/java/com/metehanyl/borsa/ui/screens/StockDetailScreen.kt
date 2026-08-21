@@ -211,10 +211,16 @@ private fun HeaderSection(quote: Quote, isPositive: Boolean) {
 
 @Composable
 private fun HoldingPositionCard(holding: Holding, quote: Quote) {
-    val currentValue = quote.price * holding.quantity
-    val costValue = holding.averageCost * holding.quantity
+    val qty = holding.effectiveQuantity
+    val currentValue = quote.price * qty
+    val costValue = holding.averageCost * qty
     val pnl = currentValue - costValue
     val pnlPct = if (costValue != 0.0) (pnl / costValue) * 100.0 else 0.0
+    val quantityLabel = if (holding.isAmountBased) {
+        "≈ ${"%.4f".format(qty)} adet (${formatPrice(holding.investedAmount ?: 0.0, quote.currency)} tutar bazlı)"
+    } else {
+        "${holding.quantity.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() }} adet"
+    }
 
     Column(
         modifier = Modifier
@@ -224,7 +230,7 @@ private fun HoldingPositionCard(holding: Holding, quote: Quote) {
     ) {
         Text("Pozisyonunuz", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
         Text(
-            "${holding.quantity} adet · ${formatPrice(holding.averageCost, quote.currency)} ortalama maliyet · ${holding.purchaseDateLabel}",
+            "$quantityLabel · ${formatPrice(holding.averageCost, quote.currency)} ortalama maliyet · ${holding.purchaseDateLabel}",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             modifier = Modifier.padding(top = 4.dp)
