@@ -128,4 +128,10 @@ class PortfolioViewModel : ViewModel() {
      * "Saatlik İşlem Hacmi" bölümü için, isteğe bağlı/gecikmeli yükleme).
      */
     suspend fun fetchIntradayVolume(symbol: String) = repository.fetchIntradayVolume(symbol)
+
+    /**
+     * Portföye pozisyon eklerken, seçilen tarihteki (veya o tarihten önceki son
+     * işlem günündeki) kapanış fiyatını çeker. Veri yoksa/hata olursa null döner.
+     */
+    suspend fun fetchHistoricalClose(symbol: String, dateMillis: Long) = repository.fetchHistoricalClose(symbol, dateMillis)
 }

@@ -60,6 +60,8 @@ import com.metehanyl.borsa.ui.components.formatPercent
 import com.metehanyl.borsa.ui.components.formatPrice
 import com.metehanyl.borsa.ui.theme.BuyGreen
 import com.metehanyl.borsa.ui.theme.SellRed
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /** Kataloğun dışında elle eklenen kağıtlar için kullanılan sektör etiketi. */
 private const val CUSTOM_SECTOR = "Kullanıcı Eklentisi"
@@ -142,6 +144,7 @@ fun HoldingsScreen(
 
     if (showAddDialog) {
         AddHoldingDialog(
+            marketViewModel = marketViewModel,
             onDismiss = { showAddDialog = false },
             onConfirm = { info, quantity, investedAmount, cost, date, note ->
                 holdingsViewModel.addHolding(info, quantity, cost, date, note, investedAmount)
@@ -290,9 +293,26 @@ private fun holdingVerdictText(pnlPct: Double?, recommendation: Recommendation):
     }
 }
 
+/** Kullanıcının pozisyonu adet mi yoksa yatırım tutarı olarak mı girdiği. */
+private enum class EntryMode { QUANTITY, AMOUNT }
+
+/** "gg.aa.yyyy" biçimindeki serbest metni ayrıştırır; uymuyorsa null döner. */
+private fun parseDateLabelToMillis(text: String): Long? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+    return try {
+        val format = SimpleDateFormat("dd.MM.yyyy", Locale("tr"))
+        format.isLenient = false
+        format.parse(trimmed)?.time
+    } catch (e: Exception) {
+        null
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddHoldingDialog(
+    marketViewModel: PortfolioViewModel,
     onDismiss: () -> Unit,
     onConfirm: (info: StockInfo, quantity: Double, investedAmount: Double?, cost: Double, dateLabel: String, note: String) -> Unit
 ) {
@@ -302,11 +322,16 @@ private fun AddHoldingDialog(
     var manualSymbol by remember { mutableStateOf("") }
     var manualName by remember { mutableStateOf("") }
     var manualMarket by remember { mutableStateOf(Market.US) }
-    var quantityText by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
+    var selectedMode by remember { mutableStateOf<EntryMode?>(null) }
+    var numberText by remember { mutableStateOf("") }
     var costText by remember { mutableStateOf("") }
+    var manualCostOverride by remember { mutableStateOf(false) }
     var dateText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
+
+    var fetchedPrice by remember { mutableStateOf<Double?>(null) }
+    var isFetchingPrice by remember { mutableStateOf(false) }
+    var fetchFailed by remember { mutableStateOf(false) }
 
     val matches = remember(searchQuery) {
         if (searchQuery.isBlank()) emptyList() else StockCatalog.all.filter {
@@ -318,12 +343,36 @@ private fun AddHoldingDialog(
         StockInfo(manualSymbol.trim().uppercase(), manualName.ifBlank { manualSymbol.trim().uppercase() }, manualMarket, CUSTOM_SECTOR)
     } else null
 
-    val quantity = quantityText.replace(",", ".").toDoubleOrNull()
-    val amount = amountText.replace(",", ".").toDoubleOrNull()
-    val cost = costText.replace(",", ".").toDoubleOrNull()
-    val hasQuantity = quantity != null && quantity > 0
-    val hasAmount = amount != null && amount > 0
-    val canConfirm = current != null && cost != null && cost > 0 && (hasQuantity || hasAmount)
+    val parsedDateMillis = remember(dateText) { parseDateLabelToMillis(dateText) }
+
+    // Kağıt ve geçerli bir tarih seçildiğinde, o tarihteki (veya öncesindeki son
+    // işlem günündeki) kapanış fiyatını otomatik çeker — kullanıcı elle maliyet
+    // girmek zorunda kalmasın diye.
+    LaunchedEffect(current?.symbol, parsedDateMillis) {
+        val symbol = current?.symbol
+        val dateMillis = parsedDateMillis
+        if (symbol != null && dateMillis != null) {
+            isFetchingPrice = true
+            fetchFailed = false
+            fetchedPrice = null
+            val price = marketViewModel.fetchHistoricalClose(symbol, dateMillis)
+            fetchedPrice = price
+            fetchFailed = price == null
+            isFetchingPrice = false
+            manualCostOverride = false
+        } else {
+            fetchedPrice = null
+            fetchFailed = false
+            isFetchingPrice = false
+        }
+    }
+
+    val number = numberText.replace(",", ".").toDoubleOrNull()
+    val hasValidNumber = number != null && number > 0
+    val manualCost = costText.replace(",", ".").toDoubleOrNull()
+    val useManualCost = manualCostOverride || fetchedPrice == null
+    val cost = if (useManualCost) manualCost else fetchedPrice
+    val canConfirm = current != null && selectedMode != null && hasValidNumber && cost != null && cost > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -420,54 +469,122 @@ private fun AddHoldingDialog(
                     }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = quantityText,
-                        onValueChange = { quantityText = it },
-                        label = { Text("Adet (opsiyonel)") },
+                        value = dateText,
+                        onValueChange = { dateText = it },
+                        label = { Text("Alış tarihi (gg.aa.yyyy, ör. 16.03.2026)") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        "Kaç adet aldığınızı bilmiyorsanız (ör. birikim uygulamasından kısmi/tutar " +
-                            "bazlı aldıysanız) adeti boş bırakıp aşağıya yatırdığınız tutarı girin.",
+                        "Bu formatta girerseniz o tarihteki kapanış fiyatını otomatik bulup " +
+                            "ortalama maliyet olarak kullanırım.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
                     )
-                    OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { amountText = it },
-                        label = { Text("Yatırım Tutarı (${resolved.market.currencySymbol}, opsiyonel)") },
-                        enabled = !hasQuantity,
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = costText,
-                        onValueChange = { costText = it },
-                        label = { Text("Ortalama alış fiyatı (${resolved.market.currencySymbol})") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (hasAmount && !hasQuantity && cost != null && cost > 0) {
-                        Text(
-                            "≈ ${"%.4f".format(amount!! / cost)} adete karşılık gelir (maliyetten türetilir).",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(top = 4.dp)
+
+                    Text("Nasıl aldınız?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)) {
+                        FilterChip(
+                            selected = selectedMode == EntryMode.QUANTITY,
+                            onClick = { selectedMode = EntryMode.QUANTITY; numberText = "" },
+                            label = { Text("Adet ile aldım") }
+                        )
+                        FilterChip(
+                            selected = selectedMode == EntryMode.AMOUNT,
+                            onClick = { selectedMode = EntryMode.AMOUNT; numberText = "" },
+                            label = { Text("Tutar ile aldım") }
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = dateText,
-                        onValueChange = { dateText = it },
-                        label = { Text("Alış tarihi (ör. 16.03.2026)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+
+                    if (selectedMode != null) {
+                        OutlinedTextField(
+                            value = numberText,
+                            onValueChange = { numberText = it },
+                            label = {
+                                Text(
+                                    if (selectedMode == EntryMode.QUANTITY) "Adet"
+                                    else "Yatırım Tutarı (${resolved.market.currencySymbol})"
+                                )
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        when {
+                            parsedDateMillis == null -> {
+                                Text(
+                                    "Fiyatı otomatik getirmek için tarihi gg.aa.yyyy formatında girin, " +
+                                        "ya da aşağıya elle girin.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                                OutlinedTextField(
+                                    value = costText,
+                                    onValueChange = { costText = it },
+                                    label = { Text("Ortalama alış fiyatı (${resolved.market.currencySymbol})") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            isFetchingPrice -> {
+                                Text(
+                                    "O tarihteki fiyat aranıyor…",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                            fetchedPrice != null && !manualCostOverride -> {
+                                Text(
+                                    "$dateText tarihli kapanış fiyatı: ${formatPrice(fetchedPrice!!, resolved.market.currencySymbol)} " +
+                                        "— ortalama maliyet olarak kullanılacak.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                                )
+                                TextButton(onClick = {
+                                    manualCostOverride = true
+                                    costText = "%.4f".format(fetchedPrice!!)
+                                }) { Text("Fiyatı elle değiştir") }
+                            }
+                            else -> {
+                                if (fetchFailed) {
+                                    Text(
+                                        "Bu tarih için otomatik fiyat bulunamadı, elle girin.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                }
+                                OutlinedTextField(
+                                    value = costText,
+                                    onValueChange = { costText = it },
+                                    label = { Text("Ortalama alış fiyatı (${resolved.market.currencySymbol})") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                if (manualCostOverride && fetchedPrice != null) {
+                                    TextButton(onClick = { manualCostOverride = false }) {
+                                        Text("Otomatik bulunan fiyata dön")
+                                    }
+                                }
+                            }
+                        }
+
+                        if (selectedMode == EntryMode.AMOUNT && hasValidNumber && cost != null && cost > 0) {
+                            Text(
+                                "≈ ${"%.4f".format(number!! / cost)} adete karşılık gelir (maliyetten türetilir).",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = noteText,
@@ -485,8 +602,9 @@ private fun AddHoldingDialog(
                 onClick = {
                     val info = current ?: return@TextButton
                     val c = cost ?: return@TextButton
-                    val q = if (hasQuantity) quantity ?: 0.0 else 0.0
-                    val a = if (!hasQuantity && hasAmount) amount else null
+                    val n = number ?: return@TextButton
+                    val q = if (selectedMode == EntryMode.QUANTITY) n else 0.0
+                    val a = if (selectedMode == EntryMode.AMOUNT) n else null
                     onConfirm(info, q, a, c, dateText.ifBlank { "-" }, noteText)
                 }
             ) { Text("Ekle") }

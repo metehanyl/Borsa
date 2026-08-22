@@ -129,6 +129,35 @@ class StockRepository {
         }
     }
 
+    /**
+     * Verilen sembolün, belirtilen tarihte veya o tarihten önceki son işlem
+     * gününde oluşan kapanış fiyatını çeker. Portföye pozisyon eklerken
+     * "alış tarihindeki fiyatı otomatik getir" özelliği için kullanılır.
+     * Sembolün geçmişi hedef tarihten sonra başlıyorsa (ör. yeni halka arz),
+     * bulunan ilk kapanış fiyatı döner. Veri çekilemezse null döner —
+     * kullanıcı bu durumda fiyatı elle girer.
+     */
+    suspend fun fetchHistoricalClose(symbol: String, dateMillis: Long): Double? {
+        return try {
+            val response = NetworkModule.getChartWithFallback(symbol, range = "max", interval = "1d")
+            val result = response.chart.result?.firstOrNull() ?: return null
+            val timestamps = result.timestamp.orEmpty()
+            val closes = result.indicators.quote?.firstOrNull()?.close.orEmpty()
+            if (timestamps.isEmpty() || closes.isEmpty()) return null
+
+            val targetSeconds = dateMillis / 1000L
+            var bestIndex = 0
+            for (i in timestamps.indices) {
+                if (timestamps[i] <= targetSeconds) bestIndex = i else break
+            }
+            closes.getOrNull(bestIndex)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun fetchOne(info: StockInfo): QuoteResult {
         return try {
             val response = NetworkModule.getChartWithFallback(info.symbol)
