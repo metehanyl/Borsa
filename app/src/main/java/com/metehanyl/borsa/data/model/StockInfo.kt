@@ -47,7 +47,9 @@ data class Quote(
     val ask: Double? = null,
     val askSize: Long? = null,
     /** Bugünkü açılış fiyatı (günlük mumun "open" değeri). */
-    val open: Double? = null
+    val open: Double? = null,
+    /** Bir sonraki bilanço açıklama tarihi (varsa; Yahoo Finance'ten). Genellikle bu tarih civarında oynaklık artar. */
+    val nextEarningsDateMillis: Long? = null
 ) {
     val changeAmount: Double get() = price - previousClose
     val changePercent: Double get() = if (previousClose != 0.0) (changeAmount / previousClose) * 100.0 else 0.0

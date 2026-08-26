@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,8 +26,12 @@ import com.metehanyl.borsa.ui.StockEntry
 import com.metehanyl.borsa.ui.theme.BuyGreen
 import com.metehanyl.borsa.ui.theme.SellRed
 
+/**
+ * @param onBuyClick verilirse satırın sonuna küçük bir "Satın Al" ikon butonu eklenir
+ * (ör. Piyasalar sekmesinde); verilmezse (ör. Önerilerim/Portföyüm) buton gösterilmez.
+ */
 @Composable
-fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = Modifier, onBuyClick: (() -> Unit)? = null) {
     val quote = entry.quote
     val isPositive = quote.changePercent >= 0
     val changeColor = if (isPositive) BuyGreen else SellRed
@@ -74,9 +82,18 @@ fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = M
             )
         }
 
-        Row(modifier = Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.End) {
+        Row(modifier = Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             entry.analysis?.let { analysis ->
                 ScoreBadge(recommendation = analysis.recommendation, score = analysis.score)
+            }
+            if (onBuyClick != null) {
+                IconButton(onClick = onBuyClick) {
+                    Icon(
+                        Icons.Filled.ShoppingCart,
+                        contentDescription = "Satın al",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

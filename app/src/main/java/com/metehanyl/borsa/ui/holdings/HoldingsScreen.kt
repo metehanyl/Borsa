@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metehanyl.borsa.analysis.Recommendation
+import com.metehanyl.borsa.analysis.computeSellGuidance
 import com.metehanyl.borsa.data.StockCatalog
 import com.metehanyl.borsa.data.model.Holding
 import com.metehanyl.borsa.data.model.Market
@@ -56,6 +57,7 @@ import com.metehanyl.borsa.data.model.StockInfo
 import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.StockEntry
 import com.metehanyl.borsa.ui.components.ScoreBadge
+import com.metehanyl.borsa.ui.components.SellGuidanceCard
 import com.metehanyl.borsa.ui.components.formatPercent
 import com.metehanyl.borsa.ui.components.formatPrice
 import com.metehanyl.borsa.ui.theme.BuyGreen
@@ -274,6 +276,11 @@ private fun HoldingCard(holding: Holding, entry: StockEntry?, onClick: () -> Uni
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                SellGuidanceCard(
+                    guidance = computeSellGuidance(quote, analysis),
+                    currency = quote.currency,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
         }
     }
@@ -311,12 +318,14 @@ private fun parseDateLabelToMillis(text: String): Long? {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddHoldingDialog(
+internal fun AddHoldingDialog(
     marketViewModel: PortfolioViewModel,
+    /** Verilirse (ör. Piyasalar sekmesindeki "Satın Al" butonundan açıldıysa) arama adımı atlanır, bu kağıtla başlanır. */
+    preselectedStock: StockInfo? = null,
     onDismiss: () -> Unit,
     onConfirm: (info: StockInfo, quantity: Double, investedAmount: Double?, cost: Double, dateLabel: String, note: String) -> Unit
 ) {
-    var selectedSymbol by remember { mutableStateOf<StockInfo?>(null) }
+    var selectedSymbol by remember(preselectedStock) { mutableStateOf(preselectedStock) }
     var searchQuery by remember { mutableStateOf("") }
     var manualEntryMode by remember { mutableStateOf(false) }
     var manualSymbol by remember { mutableStateOf("") }

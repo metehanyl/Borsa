@@ -31,5 +31,8 @@ data class YahooQuoteResult(
     val bidSize: Long? = null,
     /** En iyi satış fiyatı ve bu fiyattaki lot (hisse adedi) kuyruğu — kişi sayısı değildir. */
     val ask: Double? = null,
-    val askSize: Long? = null
+    val askSize: Long? = null,
+    /** Bir sonraki bilanço açıklama tarihi aralığının başlangıcı/bitişi (unix saniye). Yahoo çoğu sembol için verir; yoksa null. */
+    val earningsTimestampStart: Long? = null,
+    val earningsTimestampEnd: Long? = null
 )

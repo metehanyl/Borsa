@@ -97,7 +97,8 @@ class StockRepository {
                     bid = f.bid,
                     bidSize = f.bidSize,
                     ask = f.ask,
-                    askSize = f.askSize
+                    askSize = f.askSize,
+                    nextEarningsDateMillis = (f.earningsTimestampStart ?: f.earningsTimestampEnd)?.times(1000L)
                 )
             )
         }

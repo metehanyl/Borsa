@@ -81,6 +81,7 @@ fun BorsaNavHost(
             composable(ROUTE_MARKETS) {
                 MarketsScreen(
                     viewModel = marketViewModel,
+                    holdingsViewModel = holdingsViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
             }

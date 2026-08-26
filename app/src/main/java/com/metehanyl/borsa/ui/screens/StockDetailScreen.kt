@@ -48,6 +48,7 @@ import com.metehanyl.borsa.analysis.LongTermOutlook
 import com.metehanyl.borsa.analysis.NewsAnalyzer
 import com.metehanyl.borsa.analysis.NewsSentiment
 import com.metehanyl.borsa.analysis.NewsTilt
+import com.metehanyl.borsa.analysis.computeSellGuidance
 import com.metehanyl.borsa.data.model.Holding
 import com.metehanyl.borsa.data.model.IntradayPoint
 import com.metehanyl.borsa.data.model.NewsItem
@@ -57,6 +58,7 @@ import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.components.ChartRange
 import com.metehanyl.borsa.ui.components.PriceChart
 import com.metehanyl.borsa.ui.components.ScoreBadge
+import com.metehanyl.borsa.ui.components.SellGuidanceCard
 import com.metehanyl.borsa.ui.components.colorFor
 import com.metehanyl.borsa.ui.components.formatCompactNumber
 import com.metehanyl.borsa.ui.components.formatHourLabel
@@ -136,7 +138,7 @@ fun StockDetailScreen(
         ) {
             item { HeaderSection(quote, isPositive) }
             if (holding != null) {
-                item { HoldingPositionCard(holding, quote) }
+                item { HoldingPositionCard(holding, quote, analysis) }
             }
             item {
                 PriceChart(
@@ -210,7 +212,7 @@ private fun HeaderSection(quote: Quote, isPositive: Boolean) {
 }
 
 @Composable
-private fun HoldingPositionCard(holding: Holding, quote: Quote) {
+private fun HoldingPositionCard(holding: Holding, quote: Quote, analysis: Analysis?) {
     val qty = holding.effectiveQuantity
     val currentValue = quote.price * qty
     val costValue = holding.averageCost * qty
@@ -256,6 +258,13 @@ private fun HoldingPositionCard(holding: Holding, quote: Quote) {
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        if (analysis != null) {
+            SellGuidanceCard(
+                guidance = computeSellGuidance(quote, analysis),
+                currency = quote.currency,
+                modifier = Modifier.padding(top = 10.dp)
             )
         }
     }

@@ -28,23 +28,32 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.metehanyl.borsa.data.StockCatalog
 import com.metehanyl.borsa.data.model.Market
+import com.metehanyl.borsa.data.model.StockInfo
 import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.SortOrder
 import com.metehanyl.borsa.ui.components.StockListItem
+import com.metehanyl.borsa.ui.holdings.AddHoldingDialog
+import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MarketsScreen(
     viewModel: PortfolioViewModel,
+    holdingsViewModel: HoldingsViewModel,
     onStockClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    var buyTarget by remember { mutableStateOf<StockInfo?>(null) }
 
     Scaffold(
         topBar = {
@@ -101,7 +110,11 @@ fun MarketsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(state.visibleEntries, key = { it.quote.info.symbol }) { entry ->
-                                StockListItem(entry = entry, onClick = { onStockClick(entry.quote.info.symbol) })
+                                StockListItem(
+                                    entry = entry,
+                                    onClick = { onStockClick(entry.quote.info.symbol) },
+                                    onBuyClick = { buyTarget = entry.quote.info }
+                                )
                             }
                             if (state.failedSymbols.isNotEmpty()) {
                                 item {
@@ -118,6 +131,20 @@ fun MarketsScreen(
                 }
             }
         }
+    }
+
+    val target = buyTarget
+    if (target != null) {
+        AddHoldingDialog(
+            marketViewModel = viewModel,
+            preselectedStock = target,
+            onDismiss = { buyTarget = null },
+            onConfirm = { info, quantity, investedAmount, cost, date, note ->
+                holdingsViewModel.addHolding(info, quantity, cost, date, note, investedAmount)
+                if (StockCatalog.all.none { it.symbol == info.symbol }) viewModel.trackSymbol(info)
+                buyTarget = null
+            }
+        )
     }
 }
 
