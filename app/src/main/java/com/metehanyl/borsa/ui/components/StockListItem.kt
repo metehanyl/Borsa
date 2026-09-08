@@ -1,11 +1,13 @@
 package com.metehanyl.borsa.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,6 +71,12 @@ fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = M
             )
         }
 
+        MiniSparkline(
+            closes = quote.history.takeLast(30).map { it.close },
+            isPositive = isPositive,
+            modifier = Modifier.width(44.dp).height(28.dp).padding(horizontal = 6.dp)
+        )
+
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(96.dp)) {
             Text(
                 text = formatPrice(quote.price, quote.currency),
@@ -96,5 +107,31 @@ fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = M
                 }
             }
         }
+    }
+}
+
+/** Son ~30 kapanışı tek renkli, eksensiz küçük bir çizgi olarak çizer (liste satırları için hızlı bir görsel özet). */
+@Composable
+private fun MiniSparkline(closes: List<Double>, isPositive: Boolean, modifier: Modifier = Modifier) {
+    if (closes.size < 2) return
+    val color = if (isPositive) BuyGreen else SellRed
+    val min = closes.min()
+    val max = closes.max()
+    val range = (max - min).let { if (it == 0.0) 1.0 else it }
+
+    Canvas(modifier = modifier) {
+        val stepX = size.width / (closes.size - 1)
+        val path = androidx.compose.ui.graphics.Path()
+        closes.forEachIndexed { index, value ->
+            val x = index * stepX
+            val normalized = ((value - min) / range).toFloat()
+            val y = size.height - (normalized * size.height)
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path = path, color = color, style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round))
+
+        val lastNorm = ((closes.last() - min) / range).toFloat()
+        val lastY = size.height - (lastNorm * size.height)
+        drawCircle(color = color, radius = 2.dp.toPx(), center = Offset(size.width, lastY))
     }
 }

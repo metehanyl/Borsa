@@ -47,10 +47,13 @@ import com.metehanyl.borsa.analysis.CommentarySynthesizer
 import com.metehanyl.borsa.analysis.LongTermOutlook
 import com.metehanyl.borsa.analysis.NewsAnalyzer
 import com.metehanyl.borsa.analysis.NewsSentiment
+import com.metehanyl.borsa.analysis.HoldingHorizon
 import com.metehanyl.borsa.analysis.NewsTilt
+import com.metehanyl.borsa.analysis.computeHoldingHorizon
 import com.metehanyl.borsa.analysis.computeSellGuidance
 import com.metehanyl.borsa.data.model.Holding
 import com.metehanyl.borsa.data.model.IntradayPoint
+import com.metehanyl.borsa.data.model.Market
 import com.metehanyl.borsa.data.model.NewsItem
 import com.metehanyl.borsa.data.model.Quote
 import com.metehanyl.borsa.data.remote.NewsService
@@ -160,6 +163,7 @@ fun StockDetailScreen(
             if (analysis != null) {
                 item { AnalysisSection(analysis) }
                 item { LongTermOutlookCard(analysis) }
+                item { HoldingHorizonCard(computeHoldingHorizon(analysis, newsTilt)) }
                 item {
                     CommentaryCard(
                         text = CommentarySynthesizer.synthesize(quote.info.name, quote, analysis, newsTilt)
@@ -277,10 +281,21 @@ private fun KeyStatsGrid(quote: Quote) {
         add("Önceki Kapanış" to formatPrice(quote.previousClose, quote.currency))
         quote.dayHigh?.let { add("Günlük Yüksek" to formatPrice(it, quote.currency)) }
         quote.dayLow?.let { add("Günlük Düşük" to formatPrice(it, quote.currency)) }
+        // BIST'te günlük fiyat marjı (taban/tavan) genelde önceki kapanışın ±%10'udur;
+        // bazı sembollerde farklı bantlar/taban fiyat kuralları olabileceğinden bu
+        // sadece yaklaşık bir referanstır, borsanın resmi taban/tavan verisi değildir.
+        if (quote.info.market == Market.TURKEY) {
+            add("Taban (yaklaşık)" to formatPrice(quote.previousClose * 0.90, quote.currency))
+            add("Tavan (yaklaşık)" to formatPrice(quote.previousClose * 1.10, quote.currency))
+        }
         quote.weeklyChangePercent?.let { add("Haftalık Değişim" to formatPercent(it)) }
         quote.fiftyTwoWeekHigh?.let { add("52 Hafta Yüksek" to formatPrice(it, quote.currency)) }
         quote.fiftyTwoWeekLow?.let { add("52 Hafta Düşük" to formatPrice(it, quote.currency)) }
-        quote.volume?.let { add("Hacim (lot)" to formatCompactNumber(it)) }
+        quote.volume?.let { vol ->
+            add("Hacim (lot)" to formatCompactNumber(vol))
+            // Gerçek işlem hacmi (TL/USD/…) değil; lot × son fiyat ile yaklaşık bir referanstır.
+            add("Yaklaşık Hacim (${quote.currency})" to formatCompactNumber((vol * quote.price).toLong()))
+        }
         quote.marketCap?.let { add("Piyasa Değeri" to "${formatCompactNumber(it)} ${quote.currency}") }
         quote.trailingPE?.let { add("F/K Oranı" to "%.1f".format(it)) }
         quote.dividendYieldPct?.let { add("Temettü Verimi" to "%.2f%%".format(it)) }
@@ -484,6 +499,37 @@ private fun LongTermOutlookCard(analysis: Analysis) {
                 Text(reason, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f))
             }
         }
+    }
+}
+
+@Composable
+private fun HoldingHorizonCard(horizon: HoldingHorizon) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Text("Ne Kadar Süre Tutmalıyım?", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Text(
+            horizon.label,
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+        )
+        Text(
+            horizon.explanation,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+        )
+        Text(
+            "Bu, teknik sinyal + oynaklık + uzun vade görünümü + haber tonundan türetilen kaba bir " +
+                "referanstır; piyasa hareketleri önceden kesin olarak tahmin edilemez.",
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(top = 8.dp)
+        )
     }
 }
 
