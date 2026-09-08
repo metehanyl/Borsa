@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,6 +70,7 @@ import com.metehanyl.borsa.ui.components.formatCompactNumber
 import com.metehanyl.borsa.ui.components.formatHourLabel
 import com.metehanyl.borsa.ui.components.formatPercent
 import com.metehanyl.borsa.ui.components.formatPrice
+import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 import com.metehanyl.borsa.ui.theme.BuyGreen
 import com.metehanyl.borsa.ui.theme.SellRed
@@ -76,13 +80,16 @@ import com.metehanyl.borsa.ui.theme.SellRed
 fun StockDetailScreen(
     viewModel: PortfolioViewModel,
     holdingsViewModel: HoldingsViewModel,
+    favoritesViewModel: FavoritesViewModel,
     symbol: String,
     onBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val holdings by holdingsViewModel.holdings.collectAsState()
+    val favorites by favoritesViewModel.favorites.collectAsState()
     val entry = state.entries.firstOrNull { it.quote.info.symbol == symbol }
     val holding = holdings.firstOrNull { it.symbol == symbol }
+    val isFavorite = favorites.any { it.symbol == symbol }
     var selectedRange by remember { mutableStateOf(ChartRange.THREE_MONTHS) }
 
     var newsItems by remember(symbol) { mutableStateOf<List<NewsItem>>(emptyList()) }
@@ -113,6 +120,17 @@ fun StockDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+                actions = {
+                    entry?.let {
+                        IconButton(onClick = { favoritesViewModel.toggle(it.quote.info) }) {
+                            Icon(
+                                if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                contentDescription = if (isFavorite) "Favorilerden çıkar" else "Favorilere ekle",
+                                tint = if (isFavorite) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)

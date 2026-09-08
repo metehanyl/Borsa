@@ -1,6 +1,9 @@
 package com.metehanyl.borsa.data.model
 
+import kotlinx.serialization.Serializable
+
 /** Katalogdaki statik hisse/fon tanımı (sembol + görünen ad + piyasa). */
+@Serializable
 data class StockInfo(
     val symbol: String,
     val name: String,

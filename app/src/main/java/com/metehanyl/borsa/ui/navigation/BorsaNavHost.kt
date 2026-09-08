@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -20,8 +21,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.metehanyl.borsa.ui.PortfolioViewModel
+import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 import com.metehanyl.borsa.ui.holdings.HoldingsScreen
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
+import com.metehanyl.borsa.ui.screens.FavoritesScreen
 import com.metehanyl.borsa.ui.screens.MarketsScreen
 import com.metehanyl.borsa.ui.screens.RecommendationsScreen
 import com.metehanyl.borsa.ui.screens.StockDetailScreen
@@ -29,13 +32,15 @@ import com.metehanyl.borsa.ui.screens.StockDetailScreen
 private const val ROUTE_MARKETS = "markets"
 private const val ROUTE_HOLDINGS = "holdings"
 private const val ROUTE_RECOMMENDATIONS = "recommendations"
+private const val ROUTE_FAVORITES = "favorites"
 private const val ROUTE_DETAIL = "detail/{symbol}"
 
 private data class BottomDestination(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 private val bottomDestinations = listOf(
     BottomDestination(ROUTE_MARKETS, "Piyasalar", Icons.Filled.ShowChart),
-    BottomDestination(ROUTE_RECOMMENDATIONS, "Önerilerim", Icons.Filled.Star),
+    BottomDestination(ROUTE_RECOMMENDATIONS, "Önerilerim", Icons.Filled.ThumbUp),
+    BottomDestination(ROUTE_FAVORITES, "Favoriler", Icons.Filled.Star),
     BottomDestination(ROUTE_HOLDINGS, "Portföyüm", Icons.Filled.AccountBalanceWallet)
 )
 
@@ -43,6 +48,7 @@ private val bottomDestinations = listOf(
 fun BorsaNavHost(
     marketViewModel: PortfolioViewModel,
     holdingsViewModel: HoldingsViewModel,
+    favoritesViewModel: FavoritesViewModel,
     navController: NavHostController = rememberNavController()
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -82,12 +88,21 @@ fun BorsaNavHost(
                 MarketsScreen(
                     viewModel = marketViewModel,
                     holdingsViewModel = holdingsViewModel,
+                    favoritesViewModel = favoritesViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
             }
             composable(ROUTE_RECOMMENDATIONS) {
                 RecommendationsScreen(
                     viewModel = marketViewModel,
+                    favoritesViewModel = favoritesViewModel,
+                    onStockClick = { symbol -> navController.navigate("detail/$symbol") }
+                )
+            }
+            composable(ROUTE_FAVORITES) {
+                FavoritesScreen(
+                    viewModel = marketViewModel,
+                    favoritesViewModel = favoritesViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
             }
@@ -103,6 +118,7 @@ fun BorsaNavHost(
                 StockDetailScreen(
                     viewModel = marketViewModel,
                     holdingsViewModel = holdingsViewModel,
+                    favoritesViewModel = favoritesViewModel,
                     symbol = symbol,
                     onBack = { navController.popBackStack() }
                 )

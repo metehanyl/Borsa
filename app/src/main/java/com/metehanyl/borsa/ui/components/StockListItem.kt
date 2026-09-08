@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,9 +36,17 @@ import com.metehanyl.borsa.ui.theme.SellRed
 /**
  * @param onBuyClick verilirse satırın sonuna küçük bir "Satın Al" ikon butonu eklenir
  * (ör. Piyasalar sekmesinde); verilmezse (ör. Önerilerim/Portföyüm) buton gösterilmez.
+ * @param onToggleFavorite verilirse bir yıldız butonu eklenir (favorilere ekle/çıkar).
  */
 @Composable
-fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = Modifier, onBuyClick: (() -> Unit)? = null) {
+fun StockListItem(
+    entry: StockEntry,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onBuyClick: (() -> Unit)? = null,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null
+) {
     val quote = entry.quote
     val isPositive = quote.changePercent >= 0
     val changeColor = if (isPositive) BuyGreen else SellRed
@@ -96,6 +106,15 @@ fun StockListItem(entry: StockEntry, onClick: () -> Unit, modifier: Modifier = M
         Row(modifier = Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             entry.analysis?.let { analysis ->
                 ScoreBadge(recommendation = analysis.recommendation, score = analysis.score)
+            }
+            if (onToggleFavorite != null) {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        contentDescription = if (isFavorite) "Favorilerden çıkar" else "Favorilere ekle",
+                        tint = if (isFavorite) androidx.compose.ui.graphics.Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
             }
             if (onBuyClick != null) {
                 IconButton(onClick = onBuyClick) {

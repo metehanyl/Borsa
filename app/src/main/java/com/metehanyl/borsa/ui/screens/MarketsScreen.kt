@@ -42,6 +42,7 @@ import com.metehanyl.borsa.data.model.StockInfo
 import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.SortOrder
 import com.metehanyl.borsa.ui.components.StockListItem
+import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 import com.metehanyl.borsa.ui.holdings.AddHoldingDialog
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 
@@ -50,9 +51,12 @@ import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 fun MarketsScreen(
     viewModel: PortfolioViewModel,
     holdingsViewModel: HoldingsViewModel,
+    favoritesViewModel: FavoritesViewModel,
     onStockClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val favorites by favoritesViewModel.favorites.collectAsState()
+    val favoriteSymbols = remember(favorites) { favorites.map { it.symbol }.toSet() }
     var buyTarget by remember { mutableStateOf<StockInfo?>(null) }
 
     Scaffold(
@@ -113,7 +117,9 @@ fun MarketsScreen(
                                 StockListItem(
                                     entry = entry,
                                     onClick = { onStockClick(entry.quote.info.symbol) },
-                                    onBuyClick = { buyTarget = entry.quote.info }
+                                    onBuyClick = { buyTarget = entry.quote.info },
+                                    isFavorite = entry.quote.info.symbol in favoriteSymbols,
+                                    onToggleFavorite = { favoritesViewModel.toggle(entry.quote.info) }
                                 )
                             }
                             if (state.failedSymbols.isNotEmpty()) {

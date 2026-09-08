@@ -38,6 +38,7 @@ import com.metehanyl.borsa.data.model.Market
 import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.StockEntry
 import com.metehanyl.borsa.ui.components.StockListItem
+import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 
 /** Bir kağıdın "önerilerim" listesine girmesi için gereken asgari skor (Al ve üzeri). */
 private const val RECOMMENDATION_MIN_SCORE = 20
@@ -50,9 +51,12 @@ private enum class RecommendationTab { SHORT_TERM, LONG_TERM }
 @Composable
 fun RecommendationsScreen(
     viewModel: PortfolioViewModel,
+    favoritesViewModel: FavoritesViewModel,
     onStockClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val favorites by favoritesViewModel.favorites.collectAsState()
+    val favoriteSymbols = remember(favorites) { favorites.map { it.symbol }.toSet() }
     var selectedTab by remember { mutableStateOf(RecommendationTab.SHORT_TERM) }
 
     Scaffold(
@@ -109,7 +113,12 @@ fun RecommendationsScreen(
                             item { NoPickText() }
                         } else {
                             items(picks, key = { it.quote.info.symbol }) { entry ->
-                                StockListItem(entry = entry, onClick = { onStockClick(entry.quote.info.symbol) })
+                                StockListItem(
+                                    entry = entry,
+                                    onClick = { onStockClick(entry.quote.info.symbol) },
+                                    isFavorite = entry.quote.info.symbol in favoriteSymbols,
+                                    onToggleFavorite = { favoritesViewModel.toggle(entry.quote.info) }
+                                )
                             }
                         }
                     }
@@ -138,7 +147,12 @@ fun RecommendationsScreen(
                         }
                     } else {
                         items(longTermPicks, key = { it.quote.info.symbol }) { entry ->
-                            StockListItem(entry = entry, onClick = { onStockClick(entry.quote.info.symbol) })
+                            StockListItem(
+                                entry = entry,
+                                onClick = { onStockClick(entry.quote.info.symbol) },
+                                isFavorite = entry.quote.info.symbol in favoriteSymbols,
+                                onToggleFavorite = { favoritesViewModel.toggle(entry.quote.info) }
+                            )
                         }
                     }
                     item { Spacer(Modifier.height(60.dp)) }
