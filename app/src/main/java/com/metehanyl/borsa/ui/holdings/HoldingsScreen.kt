@@ -22,6 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,6 +63,7 @@ import com.metehanyl.borsa.ui.components.ScoreBadge
 import com.metehanyl.borsa.ui.components.SellGuidanceCard
 import com.metehanyl.borsa.ui.components.formatPercent
 import com.metehanyl.borsa.ui.components.formatPrice
+import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 import com.metehanyl.borsa.ui.theme.BuyGreen
 import com.metehanyl.borsa.ui.theme.SellRed
 import java.text.SimpleDateFormat
@@ -75,11 +79,15 @@ private fun isCustomHolding(symbol: String): Boolean = StockCatalog.all.none { i
 fun HoldingsScreen(
     marketViewModel: PortfolioViewModel,
     holdingsViewModel: HoldingsViewModel,
+    favoritesViewModel: FavoritesViewModel,
     onStockClick: (String) -> Unit
 ) {
     val marketState by marketViewModel.uiState.collectAsState()
     val holdings by holdingsViewModel.holdings.collectAsState()
+    val favorites by favoritesViewModel.favorites.collectAsState()
+    val favoriteSymbols = remember(favorites) { favorites.map { it.symbol }.toSet() }
     var showAddDialog by remember { mutableStateOf(false) }
+    var buyMoreTarget by remember { mutableStateOf<StockInfo?>(null) }
 
     // Uygulama yeniden açıldığında, kataloğun dışında elle eklenmiş kağıtların
     // fiyatlarının da tekrar çekilmeye başlanmasını sağlar.
@@ -136,7 +144,13 @@ fun HoldingsScreen(
                         holding = holding,
                         entry = entry,
                         onClick = { onStockClick(holding.symbol) },
-                        onDelete = { holdingsViewModel.removeHolding(holding.id) }
+                        onDelete = { holdingsViewModel.removeHolding(holding.id) },
+                        isFavorite = holding.symbol in favoriteSymbols,
+                        onToggleFavorite = {
+                            val info = entry?.quote?.info ?: StockInfo(holding.symbol, holding.name, holding.market, CUSTOM_SECTOR)
+                            favoritesViewModel.toggle(info)
+                        },
+                        onBuyMore = { entry?.quote?.info?.let { buyMoreTarget = it } }
                     )
                 }
                 item { Spacer(Modifier.height(72.dp)) }
@@ -152,6 +166,20 @@ fun HoldingsScreen(
                 holdingsViewModel.addHolding(info, quantity, cost, date, note, investedAmount)
                 if (isCustomHolding(info.symbol)) marketViewModel.trackSymbol(info)
                 showAddDialog = false
+            }
+        )
+    }
+
+    val buyMore = buyMoreTarget
+    if (buyMore != null) {
+        AddHoldingDialog(
+            marketViewModel = marketViewModel,
+            preselectedStock = buyMore,
+            onDismiss = { buyMoreTarget = null },
+            onConfirm = { info, quantity, investedAmount, cost, date, note ->
+                holdingsViewModel.addHolding(info, quantity, cost, date, note, investedAmount)
+                if (isCustomHolding(info.symbol)) marketViewModel.trackSymbol(info)
+                buyMoreTarget = null
             }
         )
     }
@@ -212,7 +240,15 @@ private fun PortfolioSummary(holdings: List<Holding>, entries: List<StockEntry>)
 }
 
 @Composable
-private fun HoldingCard(holding: Holding, entry: StockEntry?, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun HoldingCard(
+    holding: Holding,
+    entry: StockEntry?,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
+    onBuyMore: (() -> Unit)? = null
+) {
     val quote = entry?.quote
     val qty = holding.effectiveQuantity
     val currentValue = quote?.price?.times(qty)
@@ -241,6 +277,20 @@ private fun HoldingCard(holding: Holding, entry: StockEntry?, onClick: () -> Uni
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
+            }
+            if (onToggleFavorite != null) {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        contentDescription = if (isFavorite) "Favorilerden çıkar" else "Favorilere ekle",
+                        tint = if (isFavorite) androidx.compose.ui.graphics.Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            }
+            if (onBuyMore != null) {
+                IconButton(onClick = onBuyMore) {
+                    Icon(Icons.Filled.ShoppingCart, contentDescription = "Bu kağıttan daha fazla al", tint = MaterialTheme.colorScheme.primary)
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "Sil", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))

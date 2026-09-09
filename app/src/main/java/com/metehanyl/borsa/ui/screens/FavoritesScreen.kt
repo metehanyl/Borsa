@@ -20,24 +20,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metehanyl.borsa.data.StockCatalog
+import com.metehanyl.borsa.data.model.StockInfo
 import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.components.StockListItem
 import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
+import com.metehanyl.borsa.ui.holdings.AddHoldingDialog
+import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(
     viewModel: PortfolioViewModel,
+    holdingsViewModel: HoldingsViewModel,
     favoritesViewModel: FavoritesViewModel,
     onStockClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val favorites by favoritesViewModel.favorites.collectAsState()
+    var buyTarget by remember { mutableStateOf<StockInfo?>(null) }
 
     // Uygulama yeniden açıldığında, kataloğun dışında yıldızlanmış bir kağıt varsa
     // (ör. Portföyüm'e eklenmeden sadece favorilere eklenmiş elle girilen bir sembol)
@@ -90,6 +98,7 @@ fun FavoritesScreen(
                 StockListItem(
                     entry = entry,
                     onClick = { onStockClick(entry.quote.info.symbol) },
+                    onBuyClick = { buyTarget = entry.quote.info },
                     isFavorite = true,
                     onToggleFavorite = { favoritesViewModel.remove(entry.quote.info.symbol) }
                 )
@@ -105,6 +114,20 @@ fun FavoritesScreen(
                 }
             }
         }
+    }
+
+    val target = buyTarget
+    if (target != null) {
+        AddHoldingDialog(
+            marketViewModel = viewModel,
+            preselectedStock = target,
+            onDismiss = { buyTarget = null },
+            onConfirm = { info, quantity, investedAmount, cost, date, note ->
+                holdingsViewModel.addHolding(info, quantity, cost, date, note, investedAmount)
+                if (StockCatalog.all.none { it.symbol == info.symbol }) viewModel.trackSymbol(info)
+                buyTarget = null
+            }
+        )
     }
 }
 

@@ -95,6 +95,7 @@ fun BorsaNavHost(
             composable(ROUTE_RECOMMENDATIONS) {
                 RecommendationsScreen(
                     viewModel = marketViewModel,
+                    holdingsViewModel = holdingsViewModel,
                     favoritesViewModel = favoritesViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
@@ -102,6 +103,7 @@ fun BorsaNavHost(
             composable(ROUTE_FAVORITES) {
                 FavoritesScreen(
                     viewModel = marketViewModel,
+                    holdingsViewModel = holdingsViewModel,
                     favoritesViewModel = favoritesViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
@@ -110,6 +112,7 @@ fun BorsaNavHost(
                 HoldingsScreen(
                     marketViewModel = marketViewModel,
                     holdingsViewModel = holdingsViewModel,
+                    favoritesViewModel = favoritesViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
             }

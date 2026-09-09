@@ -65,4 +65,17 @@ data class Quote(
             if (past == 0.0) return null
             return ((price - past) / past) * 100.0
         }
+
+    /**
+     * Uygulama fiyat geçmişini "1 yıllık" aralıkla çeker (en fazla ~252 işlem
+     * günü). Bir kağıdın geçmişinde bundan belirgin şekilde az mum varsa
+     * (230'dan az), bu genellikle kağıdın piyasaya yaklaşık bir yıldan kısa
+     * süre önce girdiğini gösterir. Resmi/güncel bir halka arz takvimi
+     * DEĞİLDİR — elle işaretlenmez, gerçek veriden her seferinde yeniden
+     * hesaplanır; bir kağıt bir yılı doldurunca otomatik olarak bu listeden
+     * düşer. En az birkaç günlük veri ister; tamamen boş/hatalı kayıtları
+     * "yeni" diye göstermemek içindir.
+     */
+    val isLikelyRecentListing: Boolean
+        get() = history.size in 5 until 230
 }

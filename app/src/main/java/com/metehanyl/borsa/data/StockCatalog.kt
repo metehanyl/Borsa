@@ -136,6 +136,25 @@ object StockCatalog {
         add(StockInfo("DIA", "SPDR Dow Jones Industrial Average ETF", Market.US, "Endeks Fonu (ETF)"))
         add(StockInfo("GLD", "SPDR Gold Shares ETF", Market.US, "Emtia Fonu (ETF)"))
 
+        // Görece yakın zamanda halka arz olmuş şirketler — "Önerilerim > Yeni
+        // Halka Arzlar" sekmesi bunları gerçek işlem geçmişi uzunluğuna göre
+        // otomatik tespit eder; burada elle "yeni" diye işaretlenmiyorlar.
+        add(StockInfo("CRWV", "CoreWeave Inc.", Market.US, "Bulut Bilişim / Yapay Zeka Altyapısı"))
+        add(StockInfo("CRCL", "Circle Internet Group Inc.", Market.US, "Finansal Teknoloji / Kripto"))
+        add(StockInfo("TTAN", "ServiceTitan Inc.", Market.US, "Yazılım (SaaS)"))
+        add(StockInfo("RDDT", "Reddit Inc.", Market.US, "Sosyal Medya"))
+        add(StockInfo("ALAB", "Astera Labs Inc.", Market.US, "Yarı İletken"))
+        add(StockInfo("RBRK", "Rubrik Inc.", Market.US, "Veri Güvenliği / Yazılım"))
+        add(StockInfo("CART", "Instacart (Maplebear Inc.)", Market.US, "E-ticaret / Teslimat"))
+        add(StockInfo("KVYO", "Klaviyo Inc.", Market.US, "Pazarlama Yazılımı"))
+        add(StockInfo("BIRK", "Birkenstock Holding plc", Market.US, "Tüketici Ürünleri"))
+        add(StockInfo("CAVA", "CAVA Group Inc.", Market.US, "Restoran Zinciri"))
+        add(StockInfo("KVUE", "Kenvue Inc.", Market.US, "Tüketici Sağlığı"))
+        add(StockInfo("VIK", "Viking Holdings Ltd", Market.US, "Turizm / Deniz Taşımacılığı"))
+        add(StockInfo("AS", "Amer Sports Inc.", Market.US, "Spor Ürünleri"))
+        add(StockInfo("LINE", "Lineage Inc.", Market.US, "Gayrimenkul (Soğuk Depo REIT)"))
+        add(StockInfo("SARO", "StandardAero Inc.", Market.US, "Havacılık Bakım/Onarım"))
+
         // ------------------------------------------------------------------
         // Almanya (XETRA / Frankfurt)
         // ------------------------------------------------------------------
