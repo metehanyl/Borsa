@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,23 +18,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metehanyl.borsa.data.model.PricePoint
@@ -55,12 +62,17 @@ enum class ChartRange(val label: String, val tradingDays: Int) {
  * Bağımlılıksız (üçüncü parti kütüphane kullanmayan), Canvas tabanlı, detaylı
  * fiyat grafiği. Seçilen aralığa göre kapanış fiyatlarını çizgi + degrade
  * dolgu ile gösterir; 50 ve 200 günlük hareketli ortalamaları (turuncu/mor
- * çizgi) ve 52 haftalık en yüksek/en düşük seviyeleri (kesikli çizgi) üst
- * üste çizer, altında günlük hacim çubukları gösterir. Parmakla basılı tutup
+ * çizgi), 52 haftalık en yüksek/en düşük seviyeleri (kesikli çizgi) ve
+ * okunabilirlik için hafif ızgara çizgileri + fiyat etiketleri üst üste
+ * çizer, altında günlük hacim çubukları gösterir. Parmakla basılı tutup
  * sürükleyerek o güne ait Tarih/Açılış/Kapanış/Düşük/Yüksek/Değişim
  * bilgisini gösteren bir ipucu kutusu açılır. Not: bu değerler GÜNLÜK
  * mumlardır (dakikalık/anlık değil) — Yahoo Finance'ten çekilen geçmiş veri
  * bu çözünürlüktedir.
+ *
+ * @param fillAvailableHeight true ise grafik sabit bir [chartHeight] yerine,
+ * bulunduğu Column içinde (ör. ChartDetailScreen'de) kalan tüm dikey alanı
+ * doldurur — gerçek "tam ekran" grafik görünümü için kullanılır.
  */
 @Composable
 fun PriceChart(
@@ -70,7 +82,8 @@ fun PriceChart(
     onRangeSelected: (ChartRange) -> Unit,
     fiftyTwoWeekHigh: Double? = null,
     fiftyTwoWeekLow: Double? = null,
-    chartHeight: androidx.compose.ui.unit.Dp = 200.dp,
+    chartHeight: Dp = 200.dp,
+    fillAvailableHeight: Boolean = false,
     onExpandClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -88,25 +101,40 @@ fun PriceChart(
     var selectedIndex by remember(points) { mutableStateOf<Int?>(null) }
 
     Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
+        if (onExpandClick != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onExpandClick) {
+                    Icon(
+                        Icons.Filled.Fullscreen,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.height(18.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Tam Ekran Grafik", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        val boxModifier = if (fillAvailableHeight) {
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        } else {
+            Modifier
                 .fillMaxWidth()
                 .height(chartHeight)
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
                 .padding(16.dp)
-        ) {
-            if (onExpandClick != null) {
-                IconButton(
-                    onClick = onExpandClick,
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
-                ) {
-                    Icon(
-                        Icons.Filled.Fullscreen,
-                        contentDescription = "Grafiği tam ekran/detaylı görüntüle",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
+        }
+
+        Box(modifier = boxModifier) {
             if (points.size < 2) {
                 Text(
                     "Grafik için yeterli veri yok",
@@ -121,16 +149,25 @@ fun PriceChart(
                 sma200.filterNotNull().forEach { minClose = min(minClose, it); maxClose = max(maxClose, it) }
                 fiftyTwoWeekHigh?.let { maxClose = max(maxClose, it) }
                 fiftyTwoWeekLow?.let { minClose = min(minClose, it) }
+                // Üstte/altta biraz nefes payı bırak, çizgi kenara yapışmasın.
+                val paddingAmount = (maxClose - minClose) * 0.06
+                minClose -= paddingAmount
+                maxClose += paddingAmount
                 val range = (maxClose - minClose).let { if (it == 0.0) 1.0 else it }
+
                 // MaterialTheme.colorScheme bir @Composable okuyucudur; Canvas'ın çizim
                 // bloğu (DrawScope) @Composable bir bağlam DEĞİLDİR — bu yüzden rengi
                 // burada, Composable bağlamdayken önceden hesaplayıp yakalıyoruz.
                 val referenceLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                val gridLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                val axisLabelColorArgb = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f).toArgb()
+                val density = LocalDensity.current
+                val axisLabelTextSizePx = with(density) { 11.sp.toPx() }
 
                 Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(chartHeight - 32.dp)
+                        .then(if (fillAvailableHeight) Modifier.fillMaxHeight() else Modifier.height(chartHeight - 32.dp))
                         .onSizeChanged { canvasWidthPx = it.width.toFloat() }
                         .pointerInput(points) {
                             detectDragGestures(
@@ -141,7 +178,8 @@ fun PriceChart(
                             )
                         }
                 ) {
-                    val w = size.width
+                    val leftMargin = 46.dp.toPx()
+                    val w = size.width - leftMargin
                     val h = size.height
                     val stepX = if (points.size > 1) w / (points.size - 1) else w
 
@@ -150,12 +188,38 @@ fun PriceChart(
                         return h - (normalized * h)
                     }
 
+                    // Okunabilirlik için hafif yatay ızgara çizgileri + sol tarafta fiyat etiketleri
+                    val textPaint = android.graphics.Paint().apply {
+                        color = axisLabelColorArgb
+                        textSize = axisLabelTextSizePx
+                        isAntiAlias = true
+                    }
+                    val gridSteps = 4
+                    for (i in 0..gridSteps) {
+                        val fraction = i / gridSteps.toFloat()
+                        val value = minClose + (range * fraction)
+                        val y = yFor(value)
+                        drawLine(
+                            color = gridLineColor,
+                            start = Offset(leftMargin, y),
+                            end = Offset(leftMargin + w, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        val label = "%.2f".format(value)
+                        val textY = when (i) {
+                            gridSteps -> y + textPaint.textSize
+                            0 -> y - 4.dp.toPx()
+                            else -> y + (textPaint.textSize / 3f)
+                        }
+                        drawContext.canvas.nativeCanvas.drawText(label, 0f, textY, textPaint)
+                    }
+
                     // 52 haftalık en yüksek/en düşük referans çizgileri
                     fiftyTwoWeekHigh?.let { high ->
                         drawLine(
                             color = referenceLineColor,
-                            start = Offset(0f, yFor(high)),
-                            end = Offset(w, yFor(high)),
+                            start = Offset(leftMargin, yFor(high)),
+                            end = Offset(leftMargin + w, yFor(high)),
                             strokeWidth = 1.dp.toPx(),
                             pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
                         )
@@ -163,8 +227,8 @@ fun PriceChart(
                     fiftyTwoWeekLow?.let { low ->
                         drawLine(
                             color = referenceLineColor,
-                            start = Offset(0f, yFor(low)),
-                            end = Offset(w, yFor(low)),
+                            start = Offset(leftMargin, yFor(low)),
+                            end = Offset(leftMargin + w, yFor(low)),
                             strokeWidth = 1.dp.toPx(),
                             pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
                         )
@@ -173,7 +237,7 @@ fun PriceChart(
                     val path = androidx.compose.ui.graphics.Path()
                     val fillPath = androidx.compose.ui.graphics.Path()
                     points.forEachIndexed { index, point ->
-                        val x = index * stepX
+                        val x = leftMargin + index * stepX
                         val y = yFor(point.close)
                         if (index == 0) {
                             path.moveTo(x, y)
@@ -184,35 +248,36 @@ fun PriceChart(
                             fillPath.lineTo(x, y)
                         }
                     }
-                    fillPath.lineTo(w, h)
+                    fillPath.lineTo(leftMargin + w, h)
                     fillPath.close()
 
                     drawPath(
                         path = fillPath,
                         brush = Brush.verticalGradient(
-                            colors = listOf(lineColor.copy(alpha = 0.28f), lineColor.copy(alpha = 0.0f))
+                            colors = listOf(lineColor.copy(alpha = 0.30f), lineColor.copy(alpha = 0.0f))
                         )
                     )
 
                     // 50 ve 200 günlük hareketli ortalama çizgileri (varsa)
-                    drawSmaLine(sma50, stepX, ::yFor, Sma50Color)
-                    drawSmaLine(sma200, stepX, ::yFor, Sma200Color)
+                    drawSmaLine(sma50, leftMargin, stepX, ::yFor, Sma50Color)
+                    drawSmaLine(sma200, leftMargin, stepX, ::yFor, Sma200Color)
 
                     drawPath(
                         path = path,
                         color = lineColor,
-                        style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
+                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
                     )
 
-                    // Son fiyat noktası
-                    val lastX = (points.size - 1) * stepX
+                    // Son fiyat noktası (hafif hâle efektiyle vurgulanmış)
+                    val lastX = leftMargin + (points.size - 1) * stepX
                     val lastY = yFor(points.last().close)
+                    drawCircle(color = lineColor.copy(alpha = 0.25f), radius = 8.dp.toPx(), center = Offset(lastX, lastY))
                     drawCircle(color = lineColor, radius = 4.dp.toPx(), center = Offset(lastX, lastY))
 
                     // Sürüklenerek seçilen nokta: kesikli dikey çizgi + vurgulu nokta
                     selectedIndex?.let { idx ->
                         val point = points.getOrNull(idx) ?: return@let
-                        val x = idx * stepX
+                        val x = leftMargin + idx * stepX
                         val y = yFor(point.close)
                         drawLine(
                             color = lineColor.copy(alpha = 0.6f),
@@ -235,6 +300,10 @@ fun PriceChart(
         }
 
         if (points.size >= 2) {
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 46.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatShortDate(points.first().timestampMillis), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                Text(formatShortDate(points.last().timestampMillis), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
             VolumeStrip(points = points)
             ChartLegend(hasSma50 = sma50.any { it != null }, hasSma200 = sma200.any { it != null }, hasRange = fiftyTwoWeekHigh != null || fiftyTwoWeekLow != null)
         }
@@ -259,8 +328,9 @@ fun PriceChart(
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmaLine(
+private fun DrawScope.drawSmaLine(
     values: List<Double?>,
+    leftMargin: Float,
     stepX: Float,
     yFor: (Double) -> Float,
     color: Color
@@ -269,7 +339,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmaLine(
     var started = false
     values.forEachIndexed { index, value ->
         if (value == null) return@forEachIndexed
-        val x = index * stepX
+        val x = leftMargin + index * stepX
         val y = yFor(value)
         if (!started) {
             path.moveTo(x, y)
@@ -279,7 +349,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmaLine(
         }
     }
     if (started) {
-        drawPath(path = path, color = color, style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path = path, color = color, style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round))
     }
 }
 
@@ -331,7 +401,7 @@ private fun ChartLegend(hasSma50: Boolean, hasSma200: Boolean, hasRange: Boolean
 
 @Composable
 private fun LegendItem(color: Color, label: String) {
-    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
                 .width(14.dp)

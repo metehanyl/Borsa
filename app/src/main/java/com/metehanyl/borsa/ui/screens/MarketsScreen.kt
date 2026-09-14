@@ -1,16 +1,26 @@
 package com.metehanyl.borsa.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
@@ -33,9 +43,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.metehanyl.borsa.R
 import com.metehanyl.borsa.data.StockCatalog
 import com.metehanyl.borsa.data.model.Market
 import com.metehanyl.borsa.data.model.StockInfo
@@ -45,6 +58,8 @@ import com.metehanyl.borsa.ui.components.StockListItem
 import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 import com.metehanyl.borsa.ui.holdings.AddHoldingDialog
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
+import com.metehanyl.borsa.ui.theme.ThemePreference
+import com.metehanyl.borsa.ui.theme.ThemeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,18 +67,45 @@ fun MarketsScreen(
     viewModel: PortfolioViewModel,
     holdingsViewModel: HoldingsViewModel,
     favoritesViewModel: FavoritesViewModel,
+    themeViewModel: ThemeViewModel,
     onStockClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val favorites by favoritesViewModel.favorites.collectAsState()
     val favoriteSymbols = remember(favorites) { favorites.map { it.symbol }.toSet() }
     var buyTarget by remember { mutableStateOf<StockInfo?>(null) }
+    val themePreference by themeViewModel.themePreference.collectAsState()
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Küresel Borsa", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color(0xFFF5F3EE), RoundedCornerShape(7.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.logo_mark),
+                                contentDescription = "Yıldırım logosu",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("Küresel Borsa", fontWeight = FontWeight.Bold)
+                    }
+                },
                 actions = {
+                    IconButton(onClick = { themeViewModel.cycleTheme() }) {
+                        val (icon, description) = when (themePreference) {
+                            ThemePreference.SYSTEM -> Icons.Filled.BrightnessAuto to "Tema: Sistem (dokun: Açık)"
+                            ThemePreference.LIGHT -> Icons.Filled.LightMode to "Tema: Açık (dokun: Koyu)"
+                            ThemePreference.DARK -> Icons.Filled.DarkMode to "Tema: Koyu / Gece Modu (dokun: Sistem)"
+                        }
+                        Icon(icon, contentDescription = description)
+                    }
                     IconButton(onClick = { viewModel.toggleSortOrder() }) {
                         Icon(Icons.Filled.SwapVert, contentDescription = "Sıralamayı değiştir")
                     }

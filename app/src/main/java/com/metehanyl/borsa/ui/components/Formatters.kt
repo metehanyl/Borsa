@@ -30,6 +30,13 @@ fun formatDate(timestampMillis: Long): String {
     return fmt.format(date)
 }
 
+/** Kısa tarih (yıl olmadan) — grafik ekseni gibi dar alanlarda kullanılır. */
+fun formatShortDate(timestampMillis: Long): String {
+    val date = java.util.Date(timestampMillis)
+    val fmt = java.text.SimpleDateFormat("d MMM", Locale("tr", "TR"))
+    return fmt.format(date)
+}
+
 /** Saat:dakika + kısa tarih (cihazın yerel saat dilimine göre). */
 fun formatHourLabel(timestampMillis: Long): String {
     val date = java.util.Date(timestampMillis)

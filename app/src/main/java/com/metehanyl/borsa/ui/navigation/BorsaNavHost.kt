@@ -29,6 +29,7 @@ import com.metehanyl.borsa.ui.screens.FavoritesScreen
 import com.metehanyl.borsa.ui.screens.MarketsScreen
 import com.metehanyl.borsa.ui.screens.RecommendationsScreen
 import com.metehanyl.borsa.ui.screens.StockDetailScreen
+import com.metehanyl.borsa.ui.theme.ThemeViewModel
 
 private const val ROUTE_MARKETS = "markets"
 private const val ROUTE_HOLDINGS = "holdings"
@@ -51,6 +52,7 @@ fun BorsaNavHost(
     marketViewModel: PortfolioViewModel,
     holdingsViewModel: HoldingsViewModel,
     favoritesViewModel: FavoritesViewModel,
+    themeViewModel: ThemeViewModel,
     navController: NavHostController = rememberNavController()
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -91,6 +93,7 @@ fun BorsaNavHost(
                     viewModel = marketViewModel,
                     holdingsViewModel = holdingsViewModel,
                     favoritesViewModel = favoritesViewModel,
+                    themeViewModel = themeViewModel,
                     onStockClick = { symbol -> navController.navigate("detail/$symbol") }
                 )
             }
