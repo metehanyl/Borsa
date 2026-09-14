@@ -432,35 +432,57 @@ private fun DrawScope.drawSmaLine(
     }
 }
 
-/** Fiyat grafiğinin altında, aynı genişlikte, günlük işlem hacmini çubuk olarak gösterir. */
+/**
+ * Fiyat grafiğinin altında, günlük işlem hacmini çubuk olarak gösterir. Aynı
+ * `leftMargin` (54dp) kullanılır ki her çubuk, üstteki fiyat grafiğinde o
+ * güne ait noktanın TAM ALTINA denk gelsin — önceki sürümde bu pay
+ * eklenmediğinden çubuklar sola kaymış, fiyat grafiğiyle hizası bozuk
+ * görünüyordu. En yüksek hacim değeri de (fiyat eksenindekiyle aynı stilde)
+ * sol üstte bir etiket olarak gösterilir.
+ */
 @Composable
 private fun VolumeStrip(points: List<PricePoint>) {
     val volumes = points.map { it.volume ?: 0L }
     val maxVolume = volumes.maxOrNull()?.takeIf { it > 0 } ?: return
+    val axisLabelColorArgb = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f).toArgb()
+    val axisPillBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+    val density = LocalDensity.current
+    val labelTextSizePx = with(density) { 10.sp.toPx() }
+
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
         Text(
-            "Günlük İşlem Hacmi (lot)",
+            "Günlük İşlem Hacmi (lot) · Son gün: ${formatCompactNumber(volumes.last())}",
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
         )
-        Canvas(modifier = Modifier.fillMaxWidth().height(36.dp).padding(top = 2.dp)) {
-            val w = size.width
+        Canvas(modifier = Modifier.fillMaxWidth().height(42.dp).padding(top = 2.dp)) {
+            val leftMargin = 54.dp.toPx()
+            val w = size.width - leftMargin
             val h = size.height
-            val stepX = if (points.size > 1) w / points.size else w
+            val stepX = if (points.isNotEmpty()) w / points.size else w
             val barWidth = (stepX * 0.7f).coerceAtLeast(1f)
+
             points.forEachIndexed { index, point ->
                 val vol = point.volume ?: 0L
                 if (vol <= 0L) return@forEachIndexed
                 val barHeight = (vol.toFloat() / maxVolume.toFloat()) * h
                 val isUp = point.close >= (point.open ?: point.close)
                 val color = if (isUp) BuyGreen else SellRed
-                val x = index * stepX + (stepX - barWidth) / 2f
+                val x = leftMargin + index * stepX + (stepX - barWidth) / 2f
                 drawRect(
                     color = color.copy(alpha = 0.55f),
                     topLeft = Offset(x, h - barHeight),
                     size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
                 )
             }
+
+            // En yüksek hacim değeri: fiyat grafiğindeki eksen etiketleriyle aynı stil.
+            val labelPaint = android.graphics.Paint().apply {
+                color = axisLabelColorArgb
+                textSize = labelTextSizePx
+                isAntiAlias = true
+            }
+            drawAxisPillLabel(formatCompactNumber(maxVolume), labelPaint.textSize + 2.dp.toPx(), labelPaint, axisPillBg)
         }
     }
 }
