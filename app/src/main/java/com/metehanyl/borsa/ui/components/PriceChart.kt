@@ -104,6 +104,10 @@ fun PriceChart(
                 fiftyTwoWeekHigh?.let { maxClose = max(maxClose, it) }
                 fiftyTwoWeekLow?.let { minClose = min(minClose, it) }
                 val range = (maxClose - minClose).let { if (it == 0.0) 1.0 else it }
+                // MaterialTheme.colorScheme bir @Composable okuyucudur; Canvas'ın çizim
+                // bloğu (DrawScope) @Composable bir bağlam DEĞİLDİR — bu yüzden rengi
+                // burada, Composable bağlamdayken önceden hesaplayıp yakalıyoruz.
+                val referenceLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
 
                 Canvas(
                     modifier = Modifier
@@ -131,7 +135,7 @@ fun PriceChart(
                     // 52 haftalık en yüksek/en düşük referans çizgileri
                     fiftyTwoWeekHigh?.let { high ->
                         drawLine(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                            color = referenceLineColor,
                             start = Offset(0f, yFor(high)),
                             end = Offset(w, yFor(high)),
                             strokeWidth = 1.dp.toPx(),
@@ -140,7 +144,7 @@ fun PriceChart(
                     }
                     fiftyTwoWeekLow?.let { low ->
                         drawLine(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                            color = referenceLineColor,
                             start = Offset(0f, yFor(low)),
                             end = Offset(w, yFor(low)),
                             strokeWidth = 1.dp.toPx(),
