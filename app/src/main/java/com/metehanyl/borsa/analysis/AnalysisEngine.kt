@@ -5,10 +5,19 @@ import kotlin.math.roundToInt
 
 /**
  * Kural tabanlı (algoritmik) teknik analiz motoru. Bir yapay zeka modeline canlı
- * çağrı YAPMAZ — trend (SMA), momentum (RSI/MACD), kısa/orta vadeli getiri ve
- * 52 haftalık aralıktaki konum gibi standart, şeffaf teknik göstergeleri
- * ağırlıklandırarak -100..+100 arası bir "fırsat skoru" üretir. Sonuç kesin bir
- * yatırım tavsiyesi değil, eğitim amaçlı algoritmik bir değerlendirmedir.
+ * çağrı YAPMAZ — standart, şeffaf teknik göstergeleri ağırlıklandırarak -100..+100
+ * arası bir "fırsat skoru" üretir. Sonuç kesin bir yatırım tavsiyesi değil,
+ * eğitim amaçlı algoritmik bir değerlendirmedir.
+ *
+ * FELSEFE (önemli): Bu motor kasıtlı olarak "zaten yükselmiş, trendi onaylanmış"
+ * kağıtları değil, "henüz ucuzken/aşırı satılmışken erken yakalanan, tepki
+ * verme ihtimali olan" kağıtları öne çıkaracak şekilde ağırlıklandırılmıştır.
+ * Bir kağıt son aylarda çok hızlı yükseldiyse ve/veya 52 haftalık zirvesine çok
+ * yaklaştıysa, bu artık "geç kalınmış" sayılır ve skoru düşürür — "zaten
+ * yükselmiş" bir kağıda "Güçlü Al" denmez. Tersine, sert düşmüş ama dönüş
+ * belirtisi gösteren bir kağıt, hâlâ net bir aşağı trendde olsa bile daha
+ * yüksek puan alabilir. Bu YİNE DE bir garanti değildir: "ucuz" bir kağıt
+ * daha da ucuzlayabilir; hiçbir gösterge geleceği kesin bilemez.
  */
 object AnalysisEngine {
 
@@ -21,6 +30,7 @@ object AnalysisEngine {
         val sma200 = TechnicalIndicators.sma(closes, 200)
         val rsi = TechnicalIndicators.rsi(closes, 14)
         val macd = TechnicalIndicators.macd(closes)
+        val macdPrev = if (closes.size > 35) TechnicalIndicators.macd(closes.dropLast(1)) else null
         val momentum1M = TechnicalIndicators.momentumPercent(closes, 21)
         val momentum3M = TechnicalIndicators.momentumPercent(closes, 63)
         val volatility = TechnicalIndicators.annualizedVolatilityPercent(closes, 30)
@@ -34,101 +44,143 @@ object AnalysisEngine {
         var score = 0
         val reasons = mutableListOf<String>()
 
-        // 1) Trend bileşeni (ağırlık: 30 puan) — SMA50 / SMA200 ilişkisi
-        if (sma50 != null && sma200 != null) {
-            when {
-                price > sma50 && sma50 > sma200 -> {
-                    score += 30
-                    reasons += "Trend güçlü yukarı yönlü: fiyat, 50 ve 200 günlük ortalamaların üzerinde ve kısa vadeli ortalama uzun vadelinin üstünde (Golden Cross görünümü)."
-                }
-                price > sma50 && sma50 <= sma200 -> {
-                    score += 10
-                    reasons += "Fiyat 50 günlük ortalamanın üzerinde ancak uzun vadeli (200 günlük) trend henüz yukarı dönmedi."
-                }
-                price < sma50 && sma50 < sma200 -> {
-                    score -= 30
-                    reasons += "Trend aşağı yönlü: fiyat, 50 ve 200 günlük ortalamaların altında (Death Cross görünümü)."
-                }
-                else -> {
-                    score -= 10
-                    reasons += "Fiyat kısa vadeli ortalamanın altında, trend zayıflıyor."
-                }
-            }
-        } else if (sma20 != null) {
-            if (price > sma20) {
-                score += 10
-                reasons += "Fiyat 20 günlük ortalamanın üzerinde (sınırlı geçmiş veri)."
-            } else {
-                score -= 10
-                reasons += "Fiyat 20 günlük ortalamanın altında (sınırlı geçmiş veri)."
-            }
-        }
-
-        // 2) RSI bileşeni (ağırlık: 25 puan)
-        if (rsi != null) {
-            when {
-                rsi < 30 -> {
-                    score += 25
-                    reasons += "RSI ${rsi.roundToInt()} ile aşırı satım bölgesinde — teknik tepki/alım fırsatı olabilir."
-                }
-                rsi < 45 -> {
-                    score += 12
-                    reasons += "RSI ${rsi.roundToInt()} ile satım bölgesine yakın, aşırı satılmış değil."
-                }
-                rsi <= 55 -> {
-                    reasons += "RSI ${rsi.roundToInt()} ile nötr bölgede."
-                }
-                rsi <= 70 -> {
-                    score -= 12
-                    reasons += "RSI ${rsi.roundToInt()} ile alım bölgesine yakın, ısınma belirtisi var."
-                }
-                else -> {
-                    score -= 25
-                    reasons += "RSI ${rsi.roundToInt()} ile aşırı alım bölgesinde — kâr satışı/düzeltme riski yüksek."
-                }
-            }
-        }
-
-        // 3) MACD bileşeni (ağırlık: 20 puan)
-        if (macd != null) {
-            if (macd.histogram > 0) {
-                score += 20
-                reasons += "MACD sinyal çizgisinin üzerinde, kısa vadeli momentum pozitif."
-            } else {
-                score -= 20
-                reasons += "MACD sinyal çizgisinin altında, kısa vadeli momentum negatif."
-            }
-        }
-
-        // 4) Orta vadeli momentum bileşeni (ağırlık: 15 puan) — 3 aylık getiri
-        if (momentum3M != null) {
-            when {
-                momentum3M > 15 -> { score += 15; reasons += "Son 3 ayda %${momentum3M.roundToInt()} değer kazandı — güçlü pozitif momentum." }
-                momentum3M > 5 -> { score += 8; reasons += "Son 3 ayda %${momentum3M.roundToInt()} değer kazandı." }
-                momentum3M > -5 -> { reasons += "Son 3 ayda yatay seyretti (%${momentum3M.roundToInt()})." }
-                momentum3M > -15 -> { score -= 8; reasons += "Son 3 ayda %${(-momentum3M).roundToInt()} değer kaybetti." }
-                else -> { score -= 15; reasons += "Son 3 ayda %${(-momentum3M).roundToInt()} sert değer kaybetti — zayıflık belirgin." }
-            }
-        }
-
-        // 5) 52 haftalık aralıktaki konum (ağırlık: 10 puan)
+        // 1) Değerleme / konum bileşeni (ağırlık: 25 puan) — hissenin son 1 yılın
+        // en düşük mü en yüksek seviyesine mi yakın olduğu. Bu motorun EN ÖNEMLİ
+        // bileşenlerinden biridir: dipteki bir kağıt "ucuz olabilir" diye puan
+        // alır, zirvedeki bir kağıt ise "geç kalınmış olabilir" diye puan kaybeder.
         if (distFromLow != null && distFromHigh != null) {
             when {
                 distFromLow <= 10 -> {
-                    score += 10
-                    reasons += "52 haftalık en düşük seviyeye yakın (+%${distFromLow.roundToInt()}), değerleme cazip olabilir."
+                    score += 25
+                    reasons += "Hisse, son 1 yılın en düşük seviyelerine çok yakın (sadece %${distFromLow.roundToInt()} üzerinde) — bu, ucuz kalmış bir fırsat olabilir. Ama unutmayın: bazen bir hisse ucuzken daha da ucuzlayabilir, düşüşün nedeni araştırılmalı."
+                }
+                distFromLow <= 25 -> {
+                    score += 12
+                    reasons += "Hisse, son 1 yılın en düşük seviyesine bir miktar yakın (%${distFromLow.roundToInt()} üzerinde) — dip bölgesine göre ucuz sayılabilir."
                 }
                 distFromHigh >= -5 -> {
-                    score -= 10
-                    reasons += "52 haftalık en yüksek seviyeye yakın (%${distFromHigh.roundToInt()}), kâr satışı riski."
+                    score -= 25
+                    reasons += "Hisse, son 1 yılın en yüksek seviyesine çok yakın (zirveye sadece %${(-distFromHigh).roundToInt()} uzaklıkta) — büyük olasılıkla en iyi alım zamanı geçmiş olabilir, şimdi almak riskli görünüyor."
+                }
+                distFromHigh >= -15 -> {
+                    score -= 12
+                    reasons += "Hisse, son 1 yılın en yüksek seviyesine yakın (%${(-distFromHigh).roundToInt()} altında) — yükselişin çoğu muhtemelen gerçekleşmiş olabilir."
                 }
                 else -> {
-                    reasons += "52 haftalık aralığın orta kesiminde işlem görüyor."
+                    reasons += "Hisse, son 1 yıllık en düşük ve en yüksek seviyeleri arasında, ortalarda bir yerde işlem görüyor — ne çok ucuz ne çok pahalı görünüyor."
                 }
             }
         }
 
-        // 6) Hacim bileşeni (ağırlık: ±10 puan) — son işlem gününün hacmi 20 günlük
+        // 2) RSI bileşeni (ağırlık: 30 puan) — hissenin ne kadar hızlı yükselip
+        // düştüğünü 0-100 arasında ölçen bir gösterge. Düşükse ("aşırı satım")
+        // kısa vadeli bir tepki/toparlanma ihtimali artar; yüksekse ("aşırı
+        // alım") hissenin çok hızlı yükseldiği ve durup dinlenebileceği anlamına
+        // gelir.
+        if (rsi != null) {
+            when {
+                rsi < 30 -> {
+                    score += 30
+                    reasons += "RSI göstergesi ${rsi.roundToInt()} (100 üzerinden) — hisse çok hızlı düştüğü için 'aşırı satılmış' durumda. Bu tür durumlarda genelde kısa vadeli bir tepki/toparlanma görülür, bu yüzden dikkat çekici bir giriş noktası olabilir."
+                }
+                rsi < 45 -> {
+                    score += 15
+                    reasons += "RSI göstergesi ${rsi.roundToInt()} — satım bölgesine yakın ama henüz aşırıya kaçmamış."
+                }
+                rsi <= 55 -> {
+                    reasons += "RSI göstergesi ${rsi.roundToInt()} — nötr bölgede, ne aşırı alım ne aşırı satım var."
+                }
+                rsi <= 70 -> {
+                    score -= 15
+                    reasons += "RSI göstergesi ${rsi.roundToInt()} — hisse hızlı yükseliyor, 'aşırı alım' bölgesine yaklaşıyor. Yeni alım için acele etmemek daha güvenli olabilir."
+                }
+                else -> {
+                    score -= 30
+                    reasons += "RSI göstergesi ${rsi.roundToInt()} — hisse çok hızlı yükseldiği için 'aşırı alım' bölgesinde. Bu seviyeden yeni alım yapmak, tam tepede kalma riski taşır."
+                }
+            }
+        }
+
+        // 3) Erken dönüş sinyali (ağırlık: 20 puan) — MACD göstergesinin YENİ mi
+        // yoksa uzun süredir mi pozitif/negatif olduğuna bakar. Amaç: "yükseliş
+        // yeni mi başladı" (henüz geç kalınmamış) ile "yükseliş uzun süredir
+        // devam ediyor" (muhtemelen geç kalınmış) arasındaki farkı yakalamak.
+        if (macd != null) {
+            val wasPositive = macdPrev != null && macdPrev.histogram > 0
+            val wasNegative = macdPrev != null && macdPrev.histogram <= 0
+            when {
+                macd.histogram > 0 && macdPrev != null && wasNegative -> {
+                    score += 20
+                    reasons += "Kısa vadeli momentum göstergesi (MACD) az önce pozitife döndü — bu, düşüşün durup yukarı dönüşün YENİ başlamış olabileceğine işaret ediyor, henüz geç kalınmamış bir sinyal olabilir."
+                }
+                macd.histogram > 0 -> {
+                    score += 5
+                    reasons += "Kısa vadeli momentum hâlâ pozitif, ama bu yükseliş bir süredir devam ediyor — en taze fırsat bu olmayabilir."
+                }
+                macdPrev != null && wasPositive -> {
+                    score -= 20
+                    reasons += "Kısa vadeli momentum göstergesi (MACD) az önce negatife döndü — yükselişin ivme kaybettiğine ve olası bir gerilemenin başladığına işaret edebilir."
+                }
+                else -> {
+                    score -= 5
+                    reasons += "Kısa vadeli momentum hâlâ negatif; düşüş eğilimi bir süredir devam ediyor."
+                }
+            }
+        }
+
+        // 4) Genel eğilim bağlamı (ağırlık: +5 / -15) — SMA50/SMA200 (50 ve 200
+        // günlük ortalama fiyat) ilişkisi. Bu artık ana "al" sürücüsü DEĞİL,
+        // sadece bir risk bağlamı: net bir aşağı trendde "ucuz" görünen bir
+        // hisseye girmek daha risklidir ('düşen bıçağı yakalamak' denir), bu
+        // yüzden ciddi bir aşağı trend puanı düşürür; ama sırf trend yukarıysa
+        // bu tek başına büyük bir "al" nedeni sayılmaz (çünkü genelde o kağıt
+        // zaten epey yükselmiş olur).
+        if (sma50 != null && sma200 != null) {
+            when {
+                price > sma50 && sma50 > sma200 -> {
+                    score += 5
+                    reasons += "Genel eğilim (fiyatın 50 ve 200 günlük ortalamalarına göre konumu) hâlâ yukarı yönlü — bu tek başına güçlü bir alım nedeni değil ama olumlu bir arka plan sayılabilir."
+                }
+                price < sma50 && sma50 < sma200 -> {
+                    score -= 15
+                    reasons += "Genel eğilim aşağı yönlü (fiyat, 50 ve 200 günlük ortalamaların altında) — hisse zayıf bir dönemden geçiyor. Diğer göstergeler 'fırsat' dese bile, düşüşün devam etme riski var, temkinli olun."
+                }
+                else -> {
+                    score -= 3
+                    reasons += "Genel eğilim karışık/belirsiz görünüyor — kısa ve uzun vadeli ortalamalar farklı yönler gösteriyor."
+                }
+            }
+        }
+
+        // 5) Son 3 aylık fiyat değişimi (ağırlık: -8 / +5) — yumuşatılmış ve
+        // KISMEN TERS ÇEVRİLMİŞTİR: çok hızlı bir yükseliş artık ödüllendirilmez,
+        // çünkü bu genelde "geç kalınmış" anlamına gelir. Sert bir düşüş de tek
+        // başına ödüllendirilmez çünkü bunun nedeni gerçek bir sorun da olabilir
+        // — bu belirsizlik açıkça belirtilir.
+        if (momentum3M != null) {
+            when {
+                momentum3M > 25 -> {
+                    score -= 8
+                    reasons += "Son 3 ayda çok hızlı bir yükseliş yaşadı (%${momentum3M.roundToInt()}) — bu tempo genelde sürdürülemez, şu an yeni girmek riskli olabilir; en ucuz dönem geride kalmış olabilir."
+                }
+                momentum3M > 10 -> {
+                    score += 3
+                    reasons += "Son 3 ayda ılımlı bir yükseliş var (%${momentum3M.roundToInt()}), henüz aşırıya kaçmamış görünüyor."
+                }
+                momentum3M > -10 -> {
+                    reasons += "Son 3 ayda fiyat büyük bir değişim göstermedi (%${momentum3M.roundToInt()})."
+                }
+                momentum3M > -25 -> {
+                    score += 5
+                    reasons += "Son 3 ayda bir miktar gerileme yaşadı (%${momentum3M.roundToInt()}) — diğer göstergelerle birlikte değerlendirildiğinde bu bir fırsat olabilir."
+                }
+                else -> {
+                    reasons += "Son 3 ayda sert bir düşüş yaşadı (%${momentum3M.roundToInt()}). Bu, bazen bir fırsat, bazen de şirketle ilgili gerçek bir sorunun işaretidir — sadece bu göstergeye bakarak karar vermeyin, düşüşün nedenini araştırın."
+                }
+            }
+        }
+
+        // 6) Hacim bileşeni (ağırlık: ±8 puan) — son işlem gününün hacmi 20 günlük
         // ortalamaya göre ne kadar yüksek; bu, "kaç kişi işlem yaptı" değil, o gün
         // el değiştiren hisse adedinin (kaç kişi olduğunu göstermez) ortalamaya oranıdır.
         val volumes = quote.history.mapNotNull { it.volume }
@@ -139,16 +191,16 @@ object AnalysisEngine {
                 val ratio = latestVolume / avgVolume20
                 val risingPrice = momentum1M != null && momentum1M > 0
                 when {
-                    ratio >= 2.0 && risingPrice -> {
-                        score += 10
-                        reasons += "Hacim, 20 günlük ortalamanın ${"%.1f".format(ratio)} katı ve fiyat yükseliyor — güçlü alım ilgisi işareti."
-                    }
                     ratio >= 2.0 && !risingPrice -> {
-                        score -= 10
-                        reasons += "Hacim, 20 günlük ortalamanın ${"%.1f".format(ratio)} katı ama fiyat yükselmiyor — satış baskısı/panik işareti olabilir."
+                        score += 8
+                        reasons += "İşlem hacmi, 20 günlük ortalamanın ${"%.1f".format(ratio)} katı ama fiyat düşüyor — bu, satışların yoğunlaştığı ve dip bölgesinde olunabileceği bir 'panik satışı' anı olabilir."
+                    }
+                    ratio >= 2.0 && risingPrice -> {
+                        score -= 8
+                        reasons += "İşlem hacmi, 20 günlük ortalamanın ${"%.1f".format(ratio)} katı ve fiyat zaten yükseliyor — bu, yükselişin son (coşku) evresi olabilir, dikkatli olun."
                     }
                     ratio >= 1.3 -> {
-                        reasons += "Hacim ortalamanın üzerinde (${"%.1f".format(ratio)}×), ilgi artıyor."
+                        reasons += "İşlem hacmi ortalamanın üzerinde (${"%.1f".format(ratio)}×), ilgi artıyor."
                     }
                 }
             }

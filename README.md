@@ -31,13 +31,22 @@ doğrudan** Yahoo Finance'in genel (anahtarsız) `chart` uç noktasından
 
 `AnalysisEngine`, her sembol için son 1 yıllık günlük kapanış verisinden şu
 göstergeleri hesaplar ve ağırlıklandırarak **-100 ile +100 arasında bir
-"fırsat skoru"** üretir:
+"fırsat skoru"** üretir.
 
-- **Trend** (30 puan): Fiyatın 50/200 günlük ortalamalara göre konumu (Golden/Death Cross)
-- **RSI(14)** (25 puan): Aşırı alım/aşırı satım bölgesi
-- **MACD(12,26,9)** (20 puan): Kısa vadeli momentum yönü
-- **3 aylık getiri** (15 puan): Orta vadeli momentum
-- **52 haftalık aralıktaki konum** (10 puan): Dip/zirveye yakınlık
+**Felsefe (önemli):** Bu motor, kasıtlı olarak "zaten yükselmiş, trendi
+onaylanmış" kağıtları değil, "henüz ucuzken/aşırı satılmışken erken
+yakalanan, dönüş belirtisi gösteren" kağıtları öne çıkaracak şekilde
+ağırlıklandırılmıştır. Bir kağıt son aylarda çok hızlı yükseldiyse ve/veya
+52 haftalık zirvesine çok yaklaştıysa, bu "geç kalınmış" sayılır ve skoru
+düşürür. Bu yine de bir garanti değildir — "ucuz" bir kağıt daha da
+ucuzlayabilir, hiçbir gösterge geleceği kesin bilemez.
+
+- **Değerleme/konum** (25 puan): 52 haftalık dip/zirveye yakınlık — dipe yakın olmak puanı yükseltir, zirveye yakın olmak düşürür
+- **RSI(14)** (30 puan): Aşırı satım (düşük RSI) puanı yükseltir, aşırı alım (yüksek RSI) düşürür
+- **Erken dönüş sinyali — MACD(12,26,9)** (20 puan): Momentumun YENİ mi yoksa uzun süredir mi aynı yönde olduğuna bakar
+- **Genel eğilim bağlamı** (+5/-15 puan): Sadece bir risk filtresi — net bir aşağı trend puanı düşürür, ama yukarı trend tek başına büyük bir "al" nedeni sayılmaz
+- **3 aylık getiri** (-8/+5 puan): Çok hızlı bir yükseliş artık ödüllendirilmez ("geç kalınmış" sayılır)
+- **Hacim** (±8 puan): Fiyat düşerken yüksek hacim "panik satışı/dip" ihtimaline işaret eder
 
 Skor eşiklerine göre: **Güçlü Al ≥ 50**, **Al ≥ 20**, **Nötr** (-19..19),
 **Sat ≤ -20**, **Güçlü Sat ≤ -50**.

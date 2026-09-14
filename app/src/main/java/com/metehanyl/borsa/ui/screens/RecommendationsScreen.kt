@@ -249,12 +249,14 @@ private fun IntroCard() {
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
-        Text("En Güçlü Alım Sinyalleri", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Text("Şimdi Al Fırsatları", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
         Text(
-            "Her ülke için, algoritmik analiz motorunun skoru en yüksek (gerçek Al/Güçlü Al sinyali " +
-                "taşıyan) en fazla ${RECOMMENDATION_MAX_PER_MARKET} kağıt listelenir. Bu, kişisel bir " +
-                "canlı yapay zeka değerlendirmesi değildir — uygulamanın genelinde kullanılan aynı kural " +
-                "tabanlı analiz motorunun sonucudur. Yatırım tavsiyesi değildir; kendi araştırmanızı yapın.",
+            "Bu liste, ZATEN yükselmiş/güçlenmiş kağıtları değil — ucuzlamış, aşırı satılmış ve YENİ " +
+                "bir dönüş belirtisi gösteren kağıtları öne çıkarır. Amaç, 'geç kalınmadan' bir giriş " +
+                "noktası önerebilmektir. Bu, kişisel bir canlı yapay zeka değerlendirmesi değildir — " +
+                "uygulamanın genelinde kullanılan aynı kural tabanlı analiz motorunun sonucudur. Hiçbir " +
+                "gösterge geleceği kesin bilemez: 'ucuz' bir kağıt daha da ucuzlayabilir. Yatırım " +
+                "tavsiyesi değildir; kendi araştırmanızı yapın.",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             modifier = Modifier.padding(top = 4.dp)

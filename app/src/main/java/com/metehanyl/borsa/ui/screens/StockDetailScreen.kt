@@ -166,7 +166,9 @@ fun StockDetailScreen(
                     history = quote.history,
                     isPositive = isPositive,
                     selectedRange = selectedRange,
-                    onRangeSelected = { selectedRange = it }
+                    onRangeSelected = { selectedRange = it },
+                    fiftyTwoWeekHigh = quote.fiftyTwoWeekHigh,
+                    fiftyTwoWeekLow = quote.fiftyTwoWeekLow
                 )
             }
             item { KeyStatsGrid(quote) }
@@ -180,6 +182,7 @@ fun StockDetailScreen(
             }
             if (analysis != null) {
                 item { AnalysisSection(analysis) }
+                item { NewsNudgeCard(analysis, newsTilt, newsLoading) }
                 item { LongTermOutlookCard(analysis) }
                 item { HoldingHorizonCard(computeHoldingHorizon(analysis, newsTilt)) }
                 item {
@@ -451,6 +454,12 @@ private fun AnalysisSection(analysis: Analysis) {
             fontSize = 18.sp,
             color = colorFor(analysis.recommendation)
         )
+        Text(
+            "Bu değerlendirme sadece fiyat/hacim verisine dayanır (haberler dahil değildir) — aşağıda haberlerin bu görünümü nasıl etkilediğini görebilirsiniz.",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(top = 2.dp)
+        )
         Spacer(Modifier.height(12.dp))
         Text("Neden bu değerlendirme?", fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
         analysis.reasons.forEach { reason ->
@@ -480,6 +489,60 @@ private fun AnalysisSection(analysis: Analysis) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun NewsNudgeCard(analysis: Analysis, newsTilt: NewsTilt?, newsLoading: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Text("Haberler Bunu Nasıl Etkiliyor?", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        when {
+            newsLoading -> {
+                Text(
+                    "Haberler taranıyor…",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+            else -> {
+                val (nudged, note) = NewsAnalyzer.applyNewsNudge(analysis.recommendation, newsTilt)
+                if (nudged != analysis.recommendation) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                        Text(
+                            "${analysis.recommendation.shortLabel} → ${nudged.shortLabel}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = colorFor(nudged)
+                        )
+                    }
+                } else {
+                    Text(
+                        "Değerlendirme aynı: ${nudged.label}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = colorFor(nudged),
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+                note?.let {
+                    Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f), modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+        }
+        Text(
+            "Bu, sadece bu hissenin haber başlıklarına bakan basit bir tarama sonucudur; bir yapay zekanın haberleri " +
+                "okuyup yorumlaması DEĞİLDİR. Piyasalar/Önerilerim listelerindeki genel sıralama her hisse için ayrı " +
+                "haber taraması yapmadığı için (binlerce istek gerekir), sadece bu sayfada haberlere bakılır.",
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(top = 8.dp)
+        )
     }
 }
 
