@@ -28,10 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -44,6 +46,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metehanyl.borsa.data.model.PricePoint
+import com.metehanyl.borsa.ui.theme.BuyGreen
+import com.metehanyl.borsa.ui.theme.SellRed
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -60,15 +64,14 @@ enum class ChartRange(val label: String, val tradingDays: Int) {
 
 /**
  * Bağımlılıksız (üçüncü parti kütüphane kullanmayan), Canvas tabanlı, detaylı
- * fiyat grafiği. Seçilen aralığa göre kapanış fiyatlarını çizgi + degrade
- * dolgu ile gösterir; 50 ve 200 günlük hareketli ortalamaları (turuncu/mor
- * çizgi), 52 haftalık en yüksek/en düşük seviyeleri (kesikli çizgi) ve
- * okunabilirlik için hafif ızgara çizgileri + fiyat etiketleri üst üste
- * çizer, altında günlük hacim çubukları gösterir. Parmakla basılı tutup
- * sürükleyerek o güne ait Tarih/Açılış/Kapanış/Düşük/Yüksek/Değişim
- * bilgisini gösteren bir ipucu kutusu açılır. Not: bu değerler GÜNLÜK
- * mumlardır (dakikalık/anlık değil) — Yahoo Finance'ten çekilen geçmiş veri
- * bu çözünürlüktedir.
+ * fiyat grafiği. Okunabilirliği önceliklendirir: üstte seçili dönemdeki
+ * değişim özeti + renk lejantı, solda arka planlı (okunaklı) fiyat
+ * etiketleriyle ızgara çizgileri, sağda güncel fiyatı gösteren bir etiket,
+ * altta tarih etiketleri ve işlem hacmi. 50/200 günlük hareketli ortalama
+ * (turuncu/mor) ve 52 haftalık en yüksek/en düşük (kesikli çizgi) de üst
+ * üste gösterilir. Parmakla basılı tutup sürükleyerek o güne ait
+ * Tarih/Açılış/Kapanış/Düşük/Yüksek/Değişim bilgisi görülebilir. Not: bu
+ * değerler GÜNLÜK mumlardır (dakikalık/anlık değil).
  *
  * @param fillAvailableHeight true ise grafik sabit bir [chartHeight] yerine,
  * bulunduğu Column içinde (ör. ChartDetailScreen'de) kalan tüm dikey alanı
@@ -82,12 +85,12 @@ fun PriceChart(
     onRangeSelected: (ChartRange) -> Unit,
     fiftyTwoWeekHigh: Double? = null,
     fiftyTwoWeekLow: Double? = null,
-    chartHeight: Dp = 200.dp,
+    chartHeight: Dp = 240.dp,
     fillAvailableHeight: Boolean = false,
     onExpandClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val lineColor = if (isPositive) com.metehanyl.borsa.ui.theme.BuyGreen else com.metehanyl.borsa.ui.theme.SellRed
+    val lineColor = if (isPositive) BuyGreen else SellRed
     val closesAll = remember(history) { history.map { it.close } }
     val sma50All = remember(closesAll) { rollingSma(closesAll, 50) }
     val sma200All = remember(closesAll) { rollingSma(closesAll, 200) }
@@ -117,6 +120,38 @@ fun PriceChart(
                     Spacer(Modifier.width(4.dp))
                     Text("Tam Ekran Grafik", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 }
+            }
+        }
+
+        val hasSma50 = sma50.any { it != null }
+        val hasSma200 = sma200.any { it != null }
+        val hasRange = fiftyTwoWeekHigh != null || fiftyTwoWeekLow != null
+
+        if (points.size >= 2) {
+            val firstClose = points.first().close
+            val lastClose = points.last().close
+            val periodChangePct = if (firstClose != 0.0) ((lastClose - firstClose) / firstClose) * 100.0 else 0.0
+            val periodPositive = periodChangePct >= 0
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${selectedRange.label} dönemde: ${formatPercent(periodChangePct)}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (periodPositive) BuyGreen else SellRed
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                LegendItem(color = lineColor, label = "Fiyat")
+                if (hasSma50) LegendItem(color = Sma50Color, label = "50G Ort.")
+                if (hasSma200) LegendItem(color = Sma200Color, label = "200G Ort.")
+                if (hasRange) LegendItem(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), label = "52 Hafta")
             }
         }
 
@@ -150,7 +185,7 @@ fun PriceChart(
                 fiftyTwoWeekHigh?.let { maxClose = max(maxClose, it) }
                 fiftyTwoWeekLow?.let { minClose = min(minClose, it) }
                 // Üstte/altta biraz nefes payı bırak, çizgi kenara yapışmasın.
-                val paddingAmount = (maxClose - minClose) * 0.06
+                val paddingAmount = (maxClose - minClose) * 0.08
                 minClose -= paddingAmount
                 maxClose += paddingAmount
                 val range = (maxClose - minClose).let { if (it == 0.0) 1.0 else it }
@@ -158,11 +193,14 @@ fun PriceChart(
                 // MaterialTheme.colorScheme bir @Composable okuyucudur; Canvas'ın çizim
                 // bloğu (DrawScope) @Composable bir bağlam DEĞİLDİR — bu yüzden rengi
                 // burada, Composable bağlamdayken önceden hesaplayıp yakalıyoruz.
-                val referenceLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-                val gridLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                val axisLabelColorArgb = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f).toArgb()
+                val referenceLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                val gridLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+                val axisLabelColorArgb = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f).toArgb()
+                val axisPillBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                val priceTagTextColorArgb = Color.White.toArgb()
                 val density = LocalDensity.current
-                val axisLabelTextSizePx = with(density) { 11.sp.toPx() }
+                val axisLabelTextSizePx = with(density) { 12.sp.toPx() }
+                val priceTagTextSizePx = with(density) { 12.sp.toPx() }
 
                 Canvas(
                     modifier = Modifier
@@ -178,7 +216,7 @@ fun PriceChart(
                             )
                         }
                 ) {
-                    val leftMargin = 46.dp.toPx()
+                    val leftMargin = 54.dp.toPx()
                     val w = size.width - leftMargin
                     val h = size.height
                     val stepX = if (points.size > 1) w / (points.size - 1) else w
@@ -188,8 +226,9 @@ fun PriceChart(
                         return h - (normalized * h)
                     }
 
-                    // Okunabilirlik için hafif yatay ızgara çizgileri + sol tarafta fiyat etiketleri
-                    val textPaint = android.graphics.Paint().apply {
+                    // Okunabilirlik için hafif yatay ızgara çizgileri + sol tarafta, arka
+                    // planlı (kontrastı garanti eden) fiyat etiketleri.
+                    val axisPaint = android.graphics.Paint().apply {
                         color = axisLabelColorArgb
                         textSize = axisLabelTextSizePx
                         isAntiAlias = true
@@ -206,12 +245,12 @@ fun PriceChart(
                             strokeWidth = 1.dp.toPx()
                         )
                         val label = "%.2f".format(value)
-                        val textY = when (i) {
-                            gridSteps -> y + textPaint.textSize
-                            0 -> y - 4.dp.toPx()
-                            else -> y + (textPaint.textSize / 3f)
+                        val baselineY = when (i) {
+                            gridSteps -> y + axisPaint.textSize
+                            0 -> y - 3.dp.toPx()
+                            else -> y + (axisPaint.textSize / 3f)
                         }
-                        drawContext.canvas.nativeCanvas.drawText(label, 0f, textY, textPaint)
+                        drawAxisPillLabel(label, baselineY, axisPaint, axisPillBg)
                     }
 
                     // 52 haftalık en yüksek/en düşük referans çizgileri
@@ -265,14 +304,21 @@ fun PriceChart(
                     drawPath(
                         path = path,
                         color = lineColor,
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
 
-                    // Son fiyat noktası (hafif hâle efektiyle vurgulanmış)
+                    // Güncel fiyat: sağda, hemen görülebilen bir etiket kutusu ile vurgulanır.
                     val lastX = leftMargin + (points.size - 1) * stepX
                     val lastY = yFor(points.last().close)
                     drawCircle(color = lineColor.copy(alpha = 0.25f), radius = 8.dp.toPx(), center = Offset(lastX, lastY))
                     drawCircle(color = lineColor, radius = 4.dp.toPx(), center = Offset(lastX, lastY))
+                    val priceTagPaint = android.graphics.Paint().apply {
+                        color = priceTagTextColorArgb
+                        textSize = priceTagTextSizePx
+                        isAntiAlias = true
+                        isFakeBoldText = true
+                    }
+                    drawPriceTag("%.2f".format(points.last().close), lastY, leftMargin + w, lineColor, priceTagPaint)
 
                     // Sürüklenerek seçilen nokta: kesikli dikey çizgi + vurgulu nokta
                     selectedIndex?.let { idx ->
@@ -300,12 +346,13 @@ fun PriceChart(
         }
 
         if (points.size >= 2) {
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 46.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatShortDate(points.first().timestampMillis), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                Text(formatShortDate(points.last().timestampMillis), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            val midIndex = points.size / 2
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 54.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatShortDate(points.first().timestampMillis), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Text(formatShortDate(points[midIndex].timestampMillis), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Text(formatShortDate(points.last().timestampMillis), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
             }
             VolumeStrip(points = points)
-            ChartLegend(hasSma50 = sma50.any { it != null }, hasSma200 = sma200.any { it != null }, hasRange = fiftyTwoWeekHigh != null || fiftyTwoWeekLow != null)
         }
 
         Row(
@@ -326,6 +373,38 @@ fun PriceChart(
             }
         }
     }
+}
+
+/** Y ekseni fiyat etiketini, altındaki çizgi/dolgudan bağımsız hep okunaklı kalsın diye önce hafif bir arka plan kutusu, sonra metni çizer. */
+private fun DrawScope.drawAxisPillLabel(text: String, baselineY: Float, paint: android.graphics.Paint, bgColor: Color) {
+    val textWidth = paint.measureText(text)
+    val paddingH = 4.dp.toPx()
+    val top = baselineY - paint.textSize
+    val bottom = baselineY + 3.dp.toPx()
+    drawRoundRect(
+        color = bgColor,
+        topLeft = Offset(0f, top),
+        size = androidx.compose.ui.geometry.Size(textWidth + paddingH * 2, bottom - top),
+        cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+    )
+    drawContext.canvas.nativeCanvas.drawText(text, paddingH, baselineY, paint)
+}
+
+/** Grafiğin sağ kenarında, güncel fiyatı dolu renkli bir "etiket" kutusu içinde gösterir. */
+private fun DrawScope.drawPriceTag(text: String, centerY: Float, rightEdgeX: Float, bgColor: Color, paint: android.graphics.Paint) {
+    val textWidth = paint.measureText(text)
+    val paddingH = 6.dp.toPx()
+    val paddingV = 4.dp.toPx()
+    val boxHeight = paint.textSize + paddingV * 2
+    val left = rightEdgeX - textWidth - paddingH * 2
+    val top = centerY - boxHeight / 2f
+    drawRoundRect(
+        color = bgColor,
+        topLeft = Offset(left, top),
+        size = androidx.compose.ui.geometry.Size(textWidth + paddingH * 2, boxHeight),
+        cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx())
+    )
+    drawContext.canvas.nativeCanvas.drawText(text, left + paddingH, centerY + paint.textSize / 3f, paint)
 }
 
 private fun DrawScope.drawSmaLine(
@@ -374,7 +453,7 @@ private fun VolumeStrip(points: List<PricePoint>) {
                 if (vol <= 0L) return@forEachIndexed
                 val barHeight = (vol.toFloat() / maxVolume.toFloat()) * h
                 val isUp = point.close >= (point.open ?: point.close)
-                val color = if (isUp) com.metehanyl.borsa.ui.theme.BuyGreen else com.metehanyl.borsa.ui.theme.SellRed
+                val color = if (isUp) BuyGreen else SellRed
                 val x = index * stepX + (stepX - barWidth) / 2f
                 drawRect(
                     color = color.copy(alpha = 0.55f),
@@ -383,19 +462,6 @@ private fun VolumeStrip(points: List<PricePoint>) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ChartLegend(hasSma50: Boolean, hasSma200: Boolean, hasRange: Boolean) {
-    if (!hasSma50 && !hasSma200 && !hasRange) return
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        if (hasSma50) LegendItem(color = Sma50Color, label = "50 günlük ortalama")
-        if (hasSma200) LegendItem(color = Sma200Color, label = "200 günlük ortalama")
-        if (hasRange) LegendItem(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), label = "52 hafta yüksek/düşük")
     }
 }
 
@@ -409,7 +475,7 @@ private fun LegendItem(color: Color, label: String) {
                 .background(color)
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
     }
 }
 

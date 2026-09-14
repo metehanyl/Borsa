@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Borsaya uygun uygulama simgesi: yükselen mum grafiği (candlestick) motifi. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Fitiller (wick) -->
+    <path
+        android:strokeColor="#22C55E"
+        android:strokeWidth="3"
+        android:pathData="M30,62 L30,80" />
+    <path
+        android:strokeColor="#22C55E"
+        android:strokeWidth="3"
+        android:pathData="M46,50 L46,80" />
+    <path
+        android:strokeColor="#22C55E"
+        android:strokeWidth="3"
+        android:pathData="M62,36 L62,80" />
+    <path
+        android:strokeColor="#22C55E"
+        android:strokeWidth="3"
+        android:pathData="M78,24 L78,80" />
+    <!-- Mum gövdeleri (yükselen trend) -->
+    <path
+        android:fillColor="#22C55E"
+        android:pathData="M24,66 h12 v10 h-12 z" />
+    <path
+        android:fillColor="#22C55E"
+        android:pathData="M40,54 h12 v22 h-12 z" />
+    <path
+        android:fillColor="#22C55E"
+        android:pathData="M56,40 h12 v36 h-12 z" />
+    <path
+        android:fillColor="#22C55E"
+        android:pathData="M72,28 h12 v48 h-12 z" />
+</vector>
