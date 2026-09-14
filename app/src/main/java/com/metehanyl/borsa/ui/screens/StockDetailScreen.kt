@@ -511,7 +511,8 @@ private fun NewsNudgeCard(analysis: Analysis, newsTilt: NewsTilt?, newsLoading: 
                 )
             }
             else -> {
-                val (nudged, note) = NewsAnalyzer.applyNewsNudge(analysis.recommendation, newsTilt)
+                val result = NewsAnalyzer.applyNewsNudge(analysis.recommendation, newsTilt)
+                val nudged = result.recommendation
                 if (nudged != analysis.recommendation) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                         Text(
@@ -530,8 +531,28 @@ private fun NewsNudgeCard(analysis: Analysis, newsTilt: NewsTilt?, newsLoading: 
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
-                note?.let {
-                    Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f), modifier = Modifier.padding(top = 6.dp))
+                if (result.severeConflict) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .background(SellRed.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            "⚠️ Teknik görünüm ile haberler çelişiyor",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SellRed
+                        )
+                        result.note?.let {
+                            Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f), modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
+                } else {
+                    result.note?.let {
+                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f), modifier = Modifier.padding(top = 6.dp))
+                    }
                 }
             }
         }
