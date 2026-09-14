@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +70,8 @@ fun PriceChart(
     onRangeSelected: (ChartRange) -> Unit,
     fiftyTwoWeekHigh: Double? = null,
     fiftyTwoWeekLow: Double? = null,
+    chartHeight: androidx.compose.ui.unit.Dp = 200.dp,
+    onExpandClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val lineColor = if (isPositive) com.metehanyl.borsa.ui.theme.BuyGreen else com.metehanyl.borsa.ui.theme.SellRed
@@ -85,10 +91,22 @@ fun PriceChart(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(chartHeight)
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
                 .padding(16.dp)
         ) {
+            if (onExpandClick != null) {
+                IconButton(
+                    onClick = onExpandClick,
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
+                ) {
+                    Icon(
+                        Icons.Filled.Fullscreen,
+                        contentDescription = "Grafiği tam ekran/detaylı görüntüle",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
             if (points.size < 2) {
                 Text(
                     "Grafik için yeterli veri yok",
@@ -112,7 +130,7 @@ fun PriceChart(
                 Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(168.dp)
+                        .height(chartHeight - 32.dp)
                         .onSizeChanged { canvasWidthPx = it.width.toFloat() }
                         .pointerInput(points) {
                             detectDragGestures(

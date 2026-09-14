@@ -179,10 +179,10 @@ private fun MarketFilterRow(selectedMarket: Market?, onSelect: (Market?) -> Unit
 
 @Composable
 private fun SortOrderLabel(sortOrder: SortOrder, count: Int) {
-    val label = if (sortOrder == SortOrder.SCORE_ASCENDING) {
-        "Fırsat skoruna göre: düşükten yükseğe"
+    val label = if (sortOrder == SortOrder.SCORE_DESCENDING) {
+        "Sıralama: Güçlü Al'dan Sat'a"
     } else {
-        "Fırsat skoruna göre: yüksekten düşüğe"
+        "Sıralama: Sat'tan Güçlü Al'a"
     }
     Text(
         text = "$label · $count sonuç",

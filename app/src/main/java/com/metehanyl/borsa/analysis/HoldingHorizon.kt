@@ -56,3 +56,19 @@ fun computeHoldingHorizon(analysis: Analysis, newsTilt: NewsTilt?): HoldingHoriz
         )
     }
 }
+
+/**
+ * Borsayı hiç bilmeyen biri için, liste satırlarında (Piyasalar, Önerilerim,
+ * Favoriler) gösterilecek çok kısa, tek satırlık bir eylem notu. Sadece
+ * kısa vadeli teknik skora (Recommendation) dayanır — haberden BAĞIMSIZDIR,
+ * çünkü liste görünümlerinde her kağıt için haber taranmaz (bkz. NewsAnalyzer
+ * kısıtı). Hisse detayına girildiğinde computeHoldingHorizon ile haberleri de
+ * hesaba katan daha ayrıntılı bir değerlendirme gösterilir.
+ */
+fun actionNote(recommendation: Recommendation): String = when (recommendation) {
+    Recommendation.STRONG_BUY -> "Şimdi Al"
+    Recommendation.BUY -> "Al / Takip Et"
+    Recommendation.HOLD -> "1 Ay Bekle"
+    Recommendation.SELL -> "1 Ay İçinde Azalt/Sat"
+    Recommendation.STRONG_SELL -> "Şimdi Sat/Azalt"
+}

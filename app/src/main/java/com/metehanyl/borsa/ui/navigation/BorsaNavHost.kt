@@ -24,6 +24,7 @@ import com.metehanyl.borsa.ui.PortfolioViewModel
 import com.metehanyl.borsa.ui.favorites.FavoritesViewModel
 import com.metehanyl.borsa.ui.holdings.HoldingsScreen
 import com.metehanyl.borsa.ui.holdings.HoldingsViewModel
+import com.metehanyl.borsa.ui.screens.ChartDetailScreen
 import com.metehanyl.borsa.ui.screens.FavoritesScreen
 import com.metehanyl.borsa.ui.screens.MarketsScreen
 import com.metehanyl.borsa.ui.screens.RecommendationsScreen
@@ -34,6 +35,7 @@ private const val ROUTE_HOLDINGS = "holdings"
 private const val ROUTE_RECOMMENDATIONS = "recommendations"
 private const val ROUTE_FAVORITES = "favorites"
 private const val ROUTE_DETAIL = "detail/{symbol}"
+private const val ROUTE_CHART_DETAIL = "chart/{symbol}"
 
 private data class BottomDestination(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -122,6 +124,15 @@ fun BorsaNavHost(
                     viewModel = marketViewModel,
                     holdingsViewModel = holdingsViewModel,
                     favoritesViewModel = favoritesViewModel,
+                    symbol = symbol,
+                    onBack = { navController.popBackStack() },
+                    onOpenChart = { sym -> navController.navigate("chart/$sym") }
+                )
+            }
+            composable(ROUTE_CHART_DETAIL) { entry ->
+                val symbol = entry.arguments?.getString("symbol") ?: ""
+                ChartDetailScreen(
+                    viewModel = marketViewModel,
                     symbol = symbol,
                     onBack = { navController.popBackStack() }
                 )

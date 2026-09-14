@@ -82,7 +82,8 @@ fun StockDetailScreen(
     holdingsViewModel: HoldingsViewModel,
     favoritesViewModel: FavoritesViewModel,
     symbol: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenChart: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val holdings by holdingsViewModel.holdings.collectAsState()
@@ -168,7 +169,8 @@ fun StockDetailScreen(
                     selectedRange = selectedRange,
                     onRangeSelected = { selectedRange = it },
                     fiftyTwoWeekHigh = quote.fiftyTwoWeekHigh,
-                    fiftyTwoWeekLow = quote.fiftyTwoWeekLow
+                    fiftyTwoWeekLow = quote.fiftyTwoWeekLow,
+                    onExpandClick = { onOpenChart(symbol) }
                 )
             }
             item { KeyStatsGrid(quote) }

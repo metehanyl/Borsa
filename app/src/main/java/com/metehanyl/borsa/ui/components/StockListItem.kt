@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.metehanyl.borsa.analysis.actionNote
 import com.metehanyl.borsa.ui.StockEntry
 import com.metehanyl.borsa.ui.theme.BuyGreen
 import com.metehanyl.borsa.ui.theme.SellRed
@@ -79,6 +80,16 @@ fun StockListItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            entry.analysis?.let { analysis ->
+                Text(
+                    text = actionNote(analysis.recommendation),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colorFor(analysis.recommendation),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         MiniSparkline(

@@ -21,7 +21,7 @@ data class PortfolioUiState(
     val entries: List<StockEntry> = emptyList(),
     val failedSymbols: List<String> = emptyList(),
     val selectedMarket: Market? = null,
-    val sortOrder: SortOrder = SortOrder.SCORE_ASCENDING,
+    val sortOrder: SortOrder = SortOrder.SCORE_DESCENDING,
     val searchQuery: String = "",
     val lastUpdatedAtMillis: Long? = null,
     val errorMessage: String? = null
